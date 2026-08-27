@@ -164,10 +164,10 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
         onExport={(rows) =>
           exportCsv(
             "expenses.csv",
-            ["Expense", "Category", "Item", "Date", "Amount", "VAT", "Payee", "Payment method", "Reference", "Branch", "Recurring", "Status"],
+            ["Expense", "Category", "Item", "Date", "Amount", "Payment method", "Recurring", "Status"],
             rows.map((row) => [
-              row.description, row.category, row.item, row.date, row.amount, row.vatAmount, row.payee,
-              row.paymentMethod, row.reference, row.branch, row.isRecurring ? frequencyLabel(row.frequency) : "No", row.status,
+              row.description, row.category, row.item, row.date, row.amount,
+              row.paymentMethod, row.isRecurring ? frequencyLabel(row.frequency) : "No", row.status,
             ]),
           )
         }
