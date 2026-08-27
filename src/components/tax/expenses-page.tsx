@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useTaxModule, formatCurrency, periodOf, type ExpenseRecord } from "@/components/tax-module-provider";
 import { RecordDialog, ConfirmDialog, bool, num, str, type FieldValue } from "@/components/tax/record-dialog";
 import { DetailsDrawer, StatusBadge, SummaryStrip, TaxTable, TaxWorkspace, exportCsv } from "@/components/tax/tax-workspace";
-import { EXPENSE_CATALOG, EXPENSE_FREQUENCIES, PAYMENT_METHODS, itemsForCategory, daysUntil, advanceDate } from "@/lib/expense-catalog";
+import { EXPENSE_CATALOG, EXPENSE_FREQUENCIES, PAYMENT_METHODS, itemsForCategory, daysUntil, advanceDate, frequencyLabel } from "@/lib/expense-catalog";
 
 /**
  * Single Expenses module, shared by Tax Management and Finance.
@@ -42,6 +42,12 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
   const upcoming = expenses.filter((row) => row.isRecurring && row.nextDueDate && daysUntil(row.nextDueDate) <= 30).sort((a, b) => a.nextDueDate.localeCompare(b.nextDueDate));
   const createOccurrence = async (template: ExpenseRecord) => {
     if (!template.nextDueDate) return;
+    // Duplicate prevention: never create a second occurrence for the same template + due date.
+    const already = expenses.some((row) => row.recurringParentId === template.id && row.date === template.nextDueDate);
+    if (already) {
+      toast.info("An occurrence for this due date already exists");
+      return;
+    }
     saveExpense({
       description: template.description, category: template.category, item: template.item, date: template.nextDueDate,
       amount: template.amount, vatAmount: template.vatAmount, payee: template.payee, supplierId: template.supplierId,
@@ -51,8 +57,9 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
     });
     await supabase.from("tax_expenses").update({ next_due_date: advanceDate(template.nextDueDate, template.frequency) }).eq("id", template.id);
     await refresh();
-    toast.success("Pending expense created for confirmation");
+    toast.success("Pending expense created — confirm it to approve the payment");
   };
+
 
   const openCreate = () => { setEditing(null); setFormOpen(true); };
   const openEdit = (row: ExpenseRecord) => { setEditing(row); setFormOpen(true); };
@@ -135,6 +142,7 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
         columns={[
           { key: "description", label: "Expense", render: (row) => <span className="font-medium text-white">{row.description}</span> },
           { key: "category", label: "Category" },
+          { key: "item", label: "Item", hideOnMobile: true, render: (row) => row.item || "—" },
           { key: "date", label: "Date", hideOnMobile: true },
           { key: "amount", label: "Amount", render: (row) => formatCurrency(row.amount) },
           { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
@@ -145,10 +153,14 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
         onExport={(rows) =>
           exportCsv(
             "expenses.csv",
-            ["Expense", "Category", "Date", "Amount", "Status"],
-            rows.map((row) => [row.description, row.category, row.date, row.amount, row.status]),
+            ["Expense", "Category", "Item", "Date", "Amount", "VAT", "Payee", "Payment method", "Reference", "Branch", "Recurring", "Status"],
+            rows.map((row) => [
+              row.description, row.category, row.item, row.date, row.amount, row.vatAmount, row.payee,
+              row.paymentMethod, row.reference, row.branch, row.isRecurring ? frequencyLabel(row.frequency) : "No", row.status,
+            ]),
           )
         }
+
         addLabel="New expense"
         onAdd={openCreate}
         empty={{ title: "No expenses recorded", description: "Log business expenses to reduce your taxable profit.", icon: Receipt }}
@@ -195,10 +207,21 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
           detail
             ? [
                 { label: "Category", value: detail.category },
+                { label: "Item / subcategory", value: detail.item || "—" },
                 { label: "Date", value: detail.date },
                 { label: "Amount", value: formatCurrency(detail.amount) },
+                { label: "VAT", value: detail.vatAmount ? formatCurrency(detail.vatAmount) : "—" },
+                { label: "Payee", value: detail.payee || "—" },
+                { label: "Supplier", value: (suppliers as any[]).find((row) => row.id === detail.supplierId)?.name ?? "—" },
+                { label: "Payment method", value: detail.paymentMethod || "—" },
+                { label: "Reference", value: detail.reference || "—" },
+                { label: "Branch", value: detail.branch || "—" },
+                { label: "Campaign", value: (campaigns as any[]).find((row) => row.id === detail.campaignId)?.name ?? "—" },
+                { label: "Notes", value: detail.notes || "—" },
+                { label: "Recurring", value: detail.isRecurring ? `${frequencyLabel(detail.frequency)}${detail.nextDueDate ? ` · next ${detail.nextDueDate}` : ""}` : "No" },
+                { label: "From recurring template", value: detail.recurringParentId ? (expenses.find((row) => row.id === detail.recurringParentId)?.description ?? "Yes") : "—" },
                 { label: "Deductible", value: detail.deductible ? "Yes" : "No" },
-                { label: "Receipt", value: detail.receipt ? "Attached" : "Missing" },
+                { label: "Receipt", value: detail.receipt || detail.attachmentPath ? "Attached" : "Missing" },
                 { label: "Status", value: <StatusBadge value={detail.status} /> },
               ]
             : []
@@ -206,12 +229,24 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
         footer={
           detail ? (
             <>
+              {detail.status === "Pending" ? (
+                <Button
+                  className="bg-emerald-500 text-black hover:bg-emerald-400"
+                  onClick={() => {
+                    const { id, ...rest } = detail;
+                    saveExpense({ ...rest, status: "Approved" }, id);
+                    setDetail(null);
+                    toast.success("Expense confirmed");
+                  }}
+                >Confirm expense</Button>
+              ) : null}
               <Button variant="outline" className="border-white/15 bg-white/5 text-white hover:bg-white/15" onClick={() => { openEdit(detail); setDetail(null); }}>Edit</Button>
               <Button className="bg-rose-500 text-white hover:bg-rose-400" onClick={() => { setPendingDelete(detail); setDetail(null); }}>Delete</Button>
             </>
           ) : null
         }
       />
+
 
       <ConfirmDialog
         open={Boolean(pendingDelete)}
