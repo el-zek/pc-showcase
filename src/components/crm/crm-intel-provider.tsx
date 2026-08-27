@@ -331,7 +331,13 @@ export type CampaignEconomics = {
   cost: number;
   leads: number;
   acquired: number;
+  /** revenue used for ROI: real attributed sales when they exist, else manually reported */
   revenue: number;
+  /** completed sales of customers acquired by this campaign */
+  attributedRevenue: number;
+  /** revenue typed into campaign results by the user */
+  reportedRevenue: number;
+  attributedOrders: number;
   cpl: number;
   cac: number;
   conversion: number;
@@ -341,16 +347,29 @@ export type CampaignEconomics = {
   ctr: number;
 };
 
-export function campaignEconomics(budget: number, intel: CampaignIntel): CampaignEconomics {
+export function campaignEconomics(
+  budget: number,
+  intel: CampaignIntel,
+  attribution?: CampaignAttribution,
+): CampaignEconomics {
   const cost = Number(budget || 0) + Number(intel.extraCost || 0);
   const leads = Number(intel.leads || 0);
-  const acquired = Number(intel.customersAcquired || 0);
-  const revenue = Number(intel.revenue || 0);
+  const attributedRevenue = Number(attribution?.revenue ?? 0);
+  const reportedRevenue = Number(intel.revenue || 0);
+  // Real acquisitions win over the manually reported number so ROI never
+  // double-counts the same customers.
+  const acquired = attribution && attribution.acquiredCustomers > 0
+    ? attribution.acquiredCustomers
+    : Number(intel.customersAcquired || 0);
+  const revenue = attributedRevenue > 0 ? attributedRevenue : reportedRevenue;
   return {
     cost,
     leads,
     acquired,
     revenue,
+    attributedRevenue,
+    reportedRevenue,
+    attributedOrders: Number(attribution?.orders ?? 0),
     cpl: leads > 0 ? cost / leads : 0,
     cac: acquired > 0 ? cost / acquired : 0,
     conversion: leads > 0 ? (acquired / leads) * 100 : 0,
@@ -358,6 +377,7 @@ export function campaignEconomics(budget: number, intel: CampaignIntel): Campaig
     roas: cost > 0 ? revenue / cost : 0,
     engagementRate: intel.reach > 0 ? (intel.engagement / intel.reach) * 100 : 0,
     ctr: intel.impressions > 0 ? (intel.clicks / intel.impressions) * 100 : 0,
+
   };
 }
 
