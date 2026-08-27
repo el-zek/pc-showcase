@@ -164,7 +164,15 @@ function ProfilePage() {
             {customer?.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-amber-400" /> {customer.phone}</div>}
             {(customer as any)?.location && <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-amber-400" /> {(customer as any).location}</div>}
             {customer?.address && <div className="text-white/70">{customer.address}</div>}
-            <div className="flex flex-wrap gap-2 text-xs text-white/60"><span>Stage: {(customer as any)?.lifecycle_stage ?? "active_customer"}</span><span>Source: {(customer as any)?.source || "Not recorded"}</span></div>
+            <div className="flex flex-wrap gap-2 text-xs text-white/60">
+              <span>Stage: {(customer as any)?.lifecycle_stage ?? "active_customer"}</span>
+              <span>Source: {(customer as any)?.source || "Not recorded"}</span>
+              <span>
+                Campaign: {(campaigns as any[]).find((c) => c.id === (customer as any)?.acquired_campaign_id)?.name ?? "Not attributed"}
+              </span>
+              {(customer as any)?.converted_at ? <span>Converted: {dateFmt.format(new Date((customer as any).converted_at))}</span> : null}
+            </div>
+
             {(customer as any)?.notes && <p className="text-sm text-white/70">{(customer as any).notes}</p>}
           </div>
         </GlassCard>
