@@ -260,7 +260,14 @@ function ProfilePage() {
           <Field label="Lifecycle stage"><select value={form.lifecycle_stage} onChange={(e) => setForm({ ...form, lifecycle_stage: e.target.value })} className={inputCls}>{LIFECYCLE.map((stage) => <option key={stage}>{stage}</option>)}</select></Field>
           <Field label="Source"><select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} className={inputCls}><option value="">Not recorded</option>{SOURCES.map((source) => <option key={source}>{source}</option>)}</select></Field>
           <Field label="Next follow-up"><input type="date" value={form.next_follow_up} onChange={(e) => setForm({ ...form, next_follow_up: e.target.value })} className={inputCls} /></Field>
+          <Field label="Acquired through campaign">
+            <select value={form.acquired_campaign_id} onChange={(e) => setForm({ ...form, acquired_campaign_id: e.target.value })} className={inputCls}>
+              <option value="">Not acquired through a campaign</option>
+              {(campaigns as any[]).map((c) => <option key={c.id} value={c.id}>{c.name} ({c.channel})</option>)}
+            </select>
+          </Field>
           <Field label="Notes"><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputCls} /></Field>
+
         </div>
       </TopDrawer>
     </CrmShell>
