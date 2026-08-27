@@ -8,7 +8,7 @@ import { CrmShell, GlassCard } from "@/components/crm/crm-shell";
 import { SummaryStrip, StatusBadge, TaxEmptyState } from "@/components/tax/tax-workspace";
 import { TopDrawer, Field, inputCls } from "@/components/crm/top-drawer";
 import {
-  useCrmIntel, marketPosition, campaignEconomics, opportunityLevel,
+  useCrmIntel, marketPosition, campaignEconomics, opportunityLevel, emptyCampaignIntel,
   type MarketAudience,
 } from "@/components/crm/crm-intel-provider";
 
