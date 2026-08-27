@@ -30,6 +30,11 @@ function ProfilePage() {
     queryKey: ["crm-customer-sales", id],
     queryFn: async () => (await supabase.from("sales").select("id,invoice_number,total,created_at,status,payment_method").eq("customer_id", id).order("created_at", { ascending: false })).data ?? [],
   });
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ["crm-campaign-options"],
+    queryFn: async () =>
+      (await supabase.from("marketing_campaigns").select("id,name,channel").order("created_at", { ascending: false })).data ?? [],
+  });
   const { data: interactions = [] } = useQuery({
     queryKey: ["crm-customer-interactions", id],
     queryFn: async () => (await supabase.from("customer_interactions").select("*").eq("customer_id", id).order("occurred_at", { ascending: false })).data ?? [],
@@ -70,7 +75,7 @@ function ProfilePage() {
   }, [customer, firstSale, lastPurchase, orderCount, id, qc]);
 
 
-  const [form, setForm] = useState({ name: "", phone: "", location: "", customer_type: "retail", status: "active", lifecycle_stage: "active_customer", source: "", next_follow_up: "", notes: "" });
+  const [form, setForm] = useState({ name: "", phone: "", location: "", customer_type: "retail", status: "active", lifecycle_stage: "active_customer", source: "", next_follow_up: "", notes: "", acquired_campaign_id: "" });
   useEffect(() => {
     if (customer) setForm({
       name: customer.name ?? "",
@@ -82,6 +87,7 @@ function ProfilePage() {
       source: (customer as any).source ?? "",
       next_follow_up: (customer as any).next_follow_up ?? "",
       notes: (customer as any).notes ?? "",
+      acquired_campaign_id: (customer as any).acquired_campaign_id ?? "",
     });
   }, [customer]);
 
@@ -97,6 +103,7 @@ function ProfilePage() {
         source: form.source || null,
         next_follow_up: form.next_follow_up || null,
         notes: form.notes || null,
+        acquired_campaign_id: form.acquired_campaign_id || null,
       }).eq("id", id);
       if (error) throw error;
     },
