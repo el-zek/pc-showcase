@@ -277,7 +277,9 @@ function CampaignsPage() {
           ) : null}
           {(campaigns as any[]).map((c) => {
             const intel = campaignIntel(c.id);
-            const e = campaignEconomics(Number(c.budget || 0), intel);
+            const attribution = campaignAttribution(c.id);
+            const e = campaignEconomics(Number(c.budget || 0), intel, attribution);
+
             return (
               <GlassCard key={c.id} className="p-4">
                 <div className="flex items-start gap-3">
