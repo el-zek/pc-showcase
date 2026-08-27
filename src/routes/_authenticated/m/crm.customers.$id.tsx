@@ -162,13 +162,36 @@ function ProfilePage() {
           </div>
         </GlassCard>
         <GlassCard className="p-5">
-          <p className="text-xs uppercase tracking-wider text-white/60">Total Purchases</p>
+          <p className="text-xs uppercase tracking-wider text-white/60">Lifetime value</p>
           <p className="mt-1 font-display text-2xl font-bold">{money(totalPurchases)}</p>
-          <p className="mt-3 text-xs uppercase tracking-wider text-white/60">Orders</p>
-          <p className="mt-1 font-display text-2xl font-bold">{sales.filter((s: any) => s.status === "completed").length}</p>
-          <p className="mt-3 text-xs uppercase tracking-wider text-white/60">Last Purchase</p>
-          <p className="mt-1 text-sm">{lastPurchase ? dateFmt.format(new Date(lastPurchase)) : "—"}</p>
+          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-white/55">Orders</p>
+              <p className="font-semibold">{orderCount}</p>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-white/55">Average order</p>
+              <p className="font-semibold">{orderCount > 0 ? money(avgOrder) : "—"}</p>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-white/55">First purchase</p>
+              <p className="font-semibold">{firstSale ? dateFmt.format(new Date(firstSale.created_at)) : "—"}</p>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-white/55">Last purchase</p>
+              <p className="font-semibold">{lastPurchase ? dateFmt.format(new Date(lastPurchase)) : "—"}</p>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-white/55">Repeat buyer</p>
+              <p className="font-semibold">{repeatCustomer ? "Yes" : "No"}</p>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-white/55">Days since sale</p>
+              <p className="font-semibold">{daysSinceLastPurchase === null ? "—" : daysSinceLastPurchase}</p>
+            </div>
+          </div>
         </GlassCard>
+
       </div>
 
       <GlassCard className="mt-4 p-5">
