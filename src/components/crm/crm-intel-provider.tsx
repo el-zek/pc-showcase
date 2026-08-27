@@ -240,9 +240,15 @@ export function CrmIntelProvider({ children }: { children: ReactNode }) {
     return {
       audiences: state.audiences,
       allCampaignIntel: state.campaigns,
+      allAttribution: state.attribution,
+      unattributedRevenue: state.unattributedRevenue,
+      campaignAttribution: (campaignId) =>
+        state.attribution.find((a) => a.campaignId === campaignId) ?? emptyAttribution(campaignId),
+      refresh,
       sharePlan: state.sharePlan,
       campaignIntel: (campaignId) =>
         state.campaigns.find((c) => c.campaignId === campaignId) ?? emptyCampaignIntel(campaignId),
+
       saveAudience: (row) => {
         void (async () => {
           const payload = {
