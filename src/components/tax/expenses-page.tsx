@@ -9,6 +9,15 @@ import { RecordDialog, ConfirmDialog, bool, num, str, type FieldValue } from "@/
 import { DetailsDrawer, StatusBadge, SummaryStrip, TaxTable, TaxWorkspace, exportCsv } from "@/components/tax/tax-workspace";
 import { EXPENSE_CATALOG, EXPENSE_FREQUENCIES, PAYMENT_METHODS, itemsForCategory, daysUntil, advanceDate, frequencyLabel } from "@/lib/expense-catalog";
 
+/** Categories where a supplier/vendor is meaningful. */
+const SUPPLIER_CATEGORIES = [
+  "Office and Operational Costs", "Office Supplies", "Maintenance and Repair",
+  "Stock and Production", "Equipment and Assets", "Platform Development", "Logistics",
+];
+const needsSupplier = (category: string) => SUPPLIER_CATEGORIES.includes(category);
+/** Campaign only matters for marketing spend. */
+const needsCampaign = (category: string) => category === "Marketing";
+
 /**
  * Single Expenses module, shared by Tax Management and Finance.
  * Same table, same logic, same UI — only the back link differs.
