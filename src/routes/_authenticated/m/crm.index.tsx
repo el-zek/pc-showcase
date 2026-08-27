@@ -10,7 +10,7 @@ export const Route = createFileRoute("/_authenticated/m/crm/")({ component: CrmH
 
 function CrmHub() {
   const navigate = useNavigate();
-  const { market, allCampaignIntel } = useCrmIntel();
+  const { market, allCampaignIntel, campaignAttribution } = useCrmIntel();
 
   const { data: stats } = useQuery({
     queryKey: ["crm-hub-stats"],

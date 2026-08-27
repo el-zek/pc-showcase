@@ -28,7 +28,7 @@ type Form = { name: string; region: string; available: number; reach: number; ch
 const empty: Form = { name: "", region: "", available: 0, reach: 0, channels: "", notes: "" };
 
 function MarketPage() {
-  const { audiences, market, saveAudience, removeAudience, allCampaignIntel } = useCrmIntel();
+  const { audiences, market, saveAudience, removeAudience, allCampaignIntel, campaignAttribution } = useCrmIntel();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<MarketAudience | null>(null);
   const [form, setForm] = useState<Form>(empty);
