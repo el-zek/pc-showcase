@@ -65,30 +65,32 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
   const openEdit = (row: ExpenseRecord) => { setEditing(row); setFormOpen(true); };
 
   const submit = (value: Record<string, FieldValue>) => {
+    const category = str(value.category);
     saveExpense(
       {
         description: str(value.description),
-        category: str(value.category),
+        category,
         date: str(value.date),
         amount: num(value.amount),
-        deductible: editing ? editing.deductible : bool(value.deductible) || true,
-        receipt: editing ? editing.receipt : Boolean(value.attachmentPath),
         item: str(value.item),
-        vatAmount: num(value.vatAmount),
-        payee: str(value.payee),
-        supplierId: str(value.supplierId).split(" — ")[0],
+        supplierId: needsSupplier(category) ? str(value.supplierId).split(" — ")[0] : "",
         paymentMethod: str(value.paymentMethod),
-        reference: str(value.reference),
         notes: str(value.notes),
-        attachmentPath: str(value.attachmentPath),
-        branch: str(value.branch),
-        campaignId: str(value.campaignId).split(" — ")[0],
+        campaignId: needsCampaign(category) ? str(value.campaignId).split(" — ")[0] : "",
         isRecurring: bool(value.isRecurring),
-        frequency: str(value.frequency),
-        nextDueDate: str(value.nextDueDate),
-        recurringParentId: str(value.recurringParentId).split(" — ")[0],
-        taxPeriod: periodOf(str(value.date)),
+        frequency: bool(value.isRecurring) ? str(value.frequency) : "one_time",
+        nextDueDate: bool(value.isRecurring) ? str(value.nextDueDate) : "",
         status: str(value.status) as ExpenseRecord["status"],
+        // Kept for data compatibility — not part of the simplified expense form.
+        deductible: editing ? editing.deductible : true,
+        receipt: editing ? editing.receipt : false,
+        vatAmount: editing?.vatAmount ?? 0,
+        payee: editing?.payee ?? "",
+        reference: editing?.reference ?? "",
+        attachmentPath: editing?.attachmentPath ?? "",
+        branch: editing?.branch ?? "",
+        recurringParentId: editing?.recurringParentId ?? "",
+        taxPeriod: periodOf(str(value.date)),
       },
       editing?.id,
     );
