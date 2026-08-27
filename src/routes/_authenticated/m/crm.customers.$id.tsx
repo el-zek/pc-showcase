@@ -55,10 +55,18 @@ function ProfilePage() {
   useEffect(() => {
     if (!customer || !firstSale) return;
     const record = customer as any;
-    if (record.converted_at && record.first_purchase_at) return;
     const stage = ["prospect", "lead"].includes(record.lifecycle_stage)
       ? "active_customer"
       : record.lifecycle_stage;
+    const nextStage = orderCount > 1 && stage === "active_customer" ? "returning_customer" : stage;
+    // Nothing to sync once conversion, first purchase, recency and stage already match reality.
+    if (
+      record.converted_at &&
+      record.first_purchase_at &&
+      record.lifecycle_stage === nextStage &&
+      record.last_activity_at === (lastPurchase ?? record.last_activity_at)
+    ) return;
+
     supabase
       .from("customers")
       .update({
