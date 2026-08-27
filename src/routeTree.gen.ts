@@ -21,6 +21,7 @@ import { Route as AuthenticatedMFinanceRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedMEmployeesRouteImport } from './routes/_authenticated/m/employees'
 import { Route as AuthenticatedMCrmRouteImport } from './routes/_authenticated/m/crm'
 import { Route as AuthenticatedMComplianceRouteImport } from './routes/_authenticated/m/compliance'
+import { Route as AuthenticatedMBusinessPerformanceRouteImport } from './routes/_authenticated/m/business-performance'
 import { Route as AuthenticatedMAdminRouteImport } from './routes/_authenticated/m/admin'
 import { Route as AuthenticatedMCrmIndexRouteImport } from './routes/_authenticated/m/crm.index'
 import { Route as AuthenticatedMComplianceIndexRouteImport } from './routes/_authenticated/m/compliance.index'
@@ -140,6 +141,12 @@ const AuthenticatedMComplianceRoute =
   AuthenticatedMComplianceRouteImport.update({
     id: '/m/compliance',
     path: '/m/compliance',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedMBusinessPerformanceRoute =
+  AuthenticatedMBusinessPerformanceRouteImport.update({
+    id: '/m/business-performance',
+    path: '/m/business-performance',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedMAdminRoute = AuthenticatedMAdminRouteImport.update({
@@ -500,6 +507,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/m/admin': typeof AuthenticatedMAdminRouteWithChildren
+  '/m/business-performance': typeof AuthenticatedMBusinessPerformanceRoute
   '/m/compliance': typeof AuthenticatedMComplianceRouteWithChildren
   '/m/crm': typeof AuthenticatedMCrmRouteWithChildren
   '/m/employees': typeof AuthenticatedMEmployeesRouteWithChildren
@@ -573,6 +581,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/m/admin': typeof AuthenticatedMAdminRouteWithChildren
+  '/m/business-performance': typeof AuthenticatedMBusinessPerformanceRoute
   '/m/employees': typeof AuthenticatedMEmployeesRouteWithChildren
   '/m/finance': typeof AuthenticatedMFinanceRouteWithChildren
   '/m/inventory': typeof AuthenticatedMInventoryRouteWithChildren
@@ -646,6 +655,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/m/admin': typeof AuthenticatedMAdminRouteWithChildren
+  '/_authenticated/m/business-performance': typeof AuthenticatedMBusinessPerformanceRoute
   '/_authenticated/m/compliance': typeof AuthenticatedMComplianceRouteWithChildren
   '/_authenticated/m/crm': typeof AuthenticatedMCrmRouteWithChildren
   '/_authenticated/m/employees': typeof AuthenticatedMEmployeesRouteWithChildren
@@ -721,6 +731,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/m/admin'
+    | '/m/business-performance'
     | '/m/compliance'
     | '/m/crm'
     | '/m/employees'
@@ -794,6 +805,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/m/admin'
+    | '/m/business-performance'
     | '/m/employees'
     | '/m/finance'
     | '/m/inventory'
@@ -866,6 +878,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/dashboard'
     | '/_authenticated/m/admin'
+    | '/_authenticated/m/business-performance'
     | '/_authenticated/m/compliance'
     | '/_authenticated/m/crm'
     | '/_authenticated/m/employees'
@@ -1025,6 +1038,13 @@ declare module '@tanstack/react-router' {
       path: '/m/compliance'
       fullPath: '/m/compliance'
       preLoaderRoute: typeof AuthenticatedMComplianceRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/m/business-performance': {
+      id: '/_authenticated/m/business-performance'
+      path: '/m/business-performance'
+      fullPath: '/m/business-performance'
+      preLoaderRoute: typeof AuthenticatedMBusinessPerformanceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/m/admin': {
@@ -1679,6 +1699,7 @@ const AuthenticatedMTaxRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedMAdminRoute: typeof AuthenticatedMAdminRouteWithChildren
+  AuthenticatedMBusinessPerformanceRoute: typeof AuthenticatedMBusinessPerformanceRoute
   AuthenticatedMComplianceRoute: typeof AuthenticatedMComplianceRouteWithChildren
   AuthenticatedMCrmRoute: typeof AuthenticatedMCrmRouteWithChildren
   AuthenticatedMEmployeesRoute: typeof AuthenticatedMEmployeesRouteWithChildren
@@ -1692,6 +1713,8 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedMAdminRoute: AuthenticatedMAdminRouteWithChildren,
+  AuthenticatedMBusinessPerformanceRoute:
+    AuthenticatedMBusinessPerformanceRoute,
   AuthenticatedMComplianceRoute: AuthenticatedMComplianceRouteWithChildren,
   AuthenticatedMCrmRoute: AuthenticatedMCrmRouteWithChildren,
   AuthenticatedMEmployeesRoute: AuthenticatedMEmployeesRouteWithChildren,
