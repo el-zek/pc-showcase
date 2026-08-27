@@ -100,13 +100,41 @@ export type SharePlanItem = {
   status: "planned" | "scheduled" | "published" | "cancelled";
 };
 
+/**
+ * Real acquisition attribution for a campaign, derived from
+ * customers.acquired_campaign_id joined to that customer's completed sales.
+ * Nothing here is estimated — a sale only counts once, for the campaign that
+ * acquired its customer.
+ */
+export type CampaignAttribution = {
+  campaignId: string;
+  /** customers whose acquired_campaign_id is this campaign */
+  acquiredCustomers: number;
+  /** of those, how many have at least one completed sale */
+  convertedCustomers: number;
+  orders: number;
+  revenue: number;
+};
+
+export const emptyAttribution = (campaignId: string): CampaignAttribution => ({
+  campaignId,
+  acquiredCustomers: 0,
+  convertedCustomers: 0,
+  orders: 0,
+  revenue: 0,
+});
+
 type State = {
   audiences: MarketAudience[];
   campaigns: CampaignIntel[];
   sharePlan: SharePlanItem[];
+  attribution: CampaignAttribution[];
+  /** revenue from completed sales with no campaign-acquired customer */
+  unattributedRevenue: number;
 };
 
-const EMPTY: State = { audiences: [], campaigns: [], sharePlan: [] };
+const EMPTY: State = { audiences: [], campaigns: [], sharePlan: [], attribution: [], unattributedRevenue: 0 };
+
 
 export const emptyCampaignIntel = (campaignId: string): CampaignIntel => ({
   campaignId,
@@ -125,6 +153,9 @@ type Ctx = {
   audiences: MarketAudience[];
   campaignIntel: (campaignId: string) => CampaignIntel;
   allCampaignIntel: CampaignIntel[];
+  campaignAttribution: (campaignId: string) => CampaignAttribution;
+  allAttribution: CampaignAttribution[];
+  unattributedRevenue: number;
   sharePlan: SharePlanItem[];
   saveAudience: (row: Omit<MarketAudience, "id"> & { id?: string }) => void;
   removeAudience: (id: string) => void;
@@ -132,6 +163,7 @@ type Ctx = {
   saveSharePlanItem: (row: Omit<SharePlanItem, "id"> & { id?: string }) => void;
   removeSharePlanItem: (id: string) => void;
   market: { available: number; reach: number };
+  refresh: () => Promise<void>;
 };
 
 const CrmIntelContext = createContext<Ctx | null>(null);
@@ -140,12 +172,46 @@ export function CrmIntelProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(EMPTY);
 
   const refresh = useCallback(async () => {
-    const [audiences, campaigns, sharePlan] = await Promise.all([
+    const [audiences, campaigns, sharePlan, customers, sales] = await Promise.all([
       supabase.from("market_audiences").select("*").order("created_at", { ascending: false }),
       supabase.from("campaign_results").select("*"),
       supabase.from("campaign_share_plan").select("*, market_audiences(name)").order("publish_date"),
+      supabase.from("customers").select("id,acquired_campaign_id"),
+      supabase.from("sales").select("id,customer_id,total,status").eq("status", "completed"),
     ]);
     const audienceRows = audiences.data ?? [];
+
+    // Attribution: a completed sale belongs to the campaign that acquired its
+    // customer. Sales without such a customer stay unattributed.
+    const campaignByCustomer = new Map<string, string>();
+    const attribution = new Map<string, CampaignAttribution>();
+    for (const row of (customers.data ?? []) as any[]) {
+      if (!row.acquired_campaign_id) continue;
+      campaignByCustomer.set(row.id, row.acquired_campaign_id);
+      const entry = attribution.get(row.acquired_campaign_id) ?? emptyAttribution(row.acquired_campaign_id);
+      entry.acquiredCustomers += 1;
+      attribution.set(row.acquired_campaign_id, entry);
+    }
+    const convertedSeen = new Set<string>();
+    let unattributedRevenue = 0;
+    for (const sale of (sales.data ?? []) as any[]) {
+      const campaignId = sale.customer_id ? campaignByCustomer.get(sale.customer_id) : undefined;
+      const total = Number(sale.total || 0);
+      if (!campaignId) {
+        unattributedRevenue += total;
+        continue;
+      }
+      const entry = attribution.get(campaignId) ?? emptyAttribution(campaignId);
+      entry.orders += 1;
+      entry.revenue += total;
+      const key = `${campaignId}:${sale.customer_id}`;
+      if (!convertedSeen.has(key)) {
+        convertedSeen.add(key);
+        entry.convertedCustomers += 1;
+      }
+      attribution.set(campaignId, entry);
+    }
+
     setState({
       audiences: audienceRows.map((row: any) => ({
         id: row.id, name: row.name, region: row.region ?? "", available: Number(row.available_customers ?? 0),
@@ -162,8 +228,11 @@ export function CrmIntelProvider({ children }: { children: ReactNode }) {
         audience: row.market_audiences?.name ?? "", publishDate: row.publish_date ?? "", publishTime: row.publish_time ?? "",
         owner: row.owner ?? "", status: row.status,
       })),
+      attribution: Array.from(attribution.values()),
+      unattributedRevenue,
     });
   }, []);
+
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -171,9 +240,15 @@ export function CrmIntelProvider({ children }: { children: ReactNode }) {
     return {
       audiences: state.audiences,
       allCampaignIntel: state.campaigns,
+      allAttribution: state.attribution,
+      unattributedRevenue: state.unattributedRevenue,
+      campaignAttribution: (campaignId) =>
+        state.attribution.find((a) => a.campaignId === campaignId) ?? emptyAttribution(campaignId),
+      refresh,
       sharePlan: state.sharePlan,
       campaignIntel: (campaignId) =>
         state.campaigns.find((c) => c.campaignId === campaignId) ?? emptyCampaignIntel(campaignId),
+
       saveAudience: (row) => {
         void (async () => {
           const payload = {
@@ -256,7 +331,13 @@ export type CampaignEconomics = {
   cost: number;
   leads: number;
   acquired: number;
+  /** revenue used for ROI: real attributed sales when they exist, else manually reported */
   revenue: number;
+  /** completed sales of customers acquired by this campaign */
+  attributedRevenue: number;
+  /** revenue typed into campaign results by the user */
+  reportedRevenue: number;
+  attributedOrders: number;
   cpl: number;
   cac: number;
   conversion: number;
@@ -266,16 +347,29 @@ export type CampaignEconomics = {
   ctr: number;
 };
 
-export function campaignEconomics(budget: number, intel: CampaignIntel): CampaignEconomics {
+export function campaignEconomics(
+  budget: number,
+  intel: CampaignIntel,
+  attribution?: CampaignAttribution,
+): CampaignEconomics {
   const cost = Number(budget || 0) + Number(intel.extraCost || 0);
   const leads = Number(intel.leads || 0);
-  const acquired = Number(intel.customersAcquired || 0);
-  const revenue = Number(intel.revenue || 0);
+  const attributedRevenue = Number(attribution?.revenue ?? 0);
+  const reportedRevenue = Number(intel.revenue || 0);
+  // Real acquisitions win over the manually reported number so ROI never
+  // double-counts the same customers.
+  const acquired = attribution && attribution.acquiredCustomers > 0
+    ? attribution.acquiredCustomers
+    : Number(intel.customersAcquired || 0);
+  const revenue = attributedRevenue > 0 ? attributedRevenue : reportedRevenue;
   return {
     cost,
     leads,
     acquired,
     revenue,
+    attributedRevenue,
+    reportedRevenue,
+    attributedOrders: Number(attribution?.orders ?? 0),
     cpl: leads > 0 ? cost / leads : 0,
     cac: acquired > 0 ? cost / acquired : 0,
     conversion: leads > 0 ? (acquired / leads) * 100 : 0,
@@ -283,6 +377,7 @@ export function campaignEconomics(budget: number, intel: CampaignIntel): Campaig
     roas: cost > 0 ? revenue / cost : 0,
     engagementRate: intel.reach > 0 ? (intel.engagement / intel.reach) * 100 : 0,
     ctr: intel.impressions > 0 ? (intel.clicks / intel.impressions) * 100 : 0,
+
   };
 }
 
