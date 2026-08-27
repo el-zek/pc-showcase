@@ -9,6 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ModernDialog, panelControlCls, panelLabelCls } from "@/components/ui/modern-dialog";
 
 
+/** Sentinel for the "no selection" option — Radix rejects empty item values. */
+const NONE = "__none__";
+
 export type FieldValue = string | number | boolean;
 
 export type Field = {
@@ -116,14 +119,19 @@ export function RecordDialog({
             <div key={field.name} className={field.half ? "sm:col-span-1" : "sm:col-span-2"}>
               <Label className={panelLabelCls}>{field.label}</Label>
               {field.type === "select" ? (
-                <Select value={String(values[field.name] ?? "")} onValueChange={(value) => set(field.name, value)}>
+                /* Radix forbids empty SelectItem values, so "" options are mapped to a sentinel. */
+                <Select
+                  value={String(values[field.name] ?? "") === "" ? NONE : String(values[field.name])}
+                  onValueChange={(value) => set(field.name, value === NONE ? "" : value)}
+                >
                   <SelectTrigger className={panelControlCls}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {(field.options ?? []).map((option) => (
-                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                      <SelectItem key={option || NONE} value={option || NONE}>{option || "None"}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+
               ) : field.type === "image" ? (
                 <div className="mt-2 space-y-2">
                   {values[field.name] ? (
