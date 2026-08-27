@@ -18,7 +18,8 @@ function Reports() {
     queryFn: async () => {
       const [sales, expenses, saleItems] = await Promise.all([
         supabase.from("sales").select("total,created_at,payment_method").eq("status", "completed"),
-        supabase.from("expenses").select("amount,expense_date"),
+        // tax_expenses is the authoritative expense ledger for the whole system.
+        supabase.from("tax_expenses").select("amount,date,status,category"),
         supabase.from("sale_items").select("product_name,quantity,line_total"),
       ]);
       const months: { month: string; sales: number; expenses: number }[] = [];
@@ -32,8 +33,9 @@ function Reports() {
         const k = d.toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
         const b = months.find((x) => x.month === k); if (b) b.sales += Number(s.total);
       });
-      (expenses.data ?? []).forEach((e) => {
-        const d = new Date(e.expense_date);
+      (expenses.data ?? []).forEach((e: any) => {
+        if (e.status === "Pending") return; // unconfirmed recurring occurrences are not actual spend yet
+        const d = new Date(`${e.date}T00:00:00`);
         const k = d.toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
         const b = months.find((x) => x.month === k); if (b) b.expenses += Number(e.amount);
       });
@@ -43,21 +45,31 @@ function Reports() {
       const prodAgg: Record<string, number> = {};
       (saleItems.data ?? []).forEach((it: any) => { prodAgg[it.product_name] = (prodAgg[it.product_name] ?? 0) + Number(it.line_total); });
       const topProducts = Object.entries(prodAgg).sort((a,b) => b[1] - a[1]).slice(0, 8).map(([name, total]) => ({ name, total }));
-      return { months, methods, topProducts };
+      const catAgg: Record<string, number> = {};
+      (expenses.data ?? []).forEach((e: any) => {
+        if (e.status === "Pending") return;
+        const k = e.category || "Uncategorised";
+        catAgg[k] = (catAgg[k] ?? 0) + Number(e.amount);
+      });
+      const expenseCategories = Object.entries(catAgg).sort((a,b) => b[1] - a[1]).slice(0, 8).map(([name, total]) => ({ name, total }));
+      return { months, methods, topProducts, expenseCategories };
     },
   });
 
+  const [view, setView] = useState<"sales" | "expenses" | "methods" | "products">("sales");
+
   const cards = [
-    { label: "Sales", icon: TrendingUp, onClick: () => toast.info("View sales reports") },
-    { label: "Expenses", icon: BarChart3, onClick: () => toast.info("View expense reports") },
-    { label: "Methods", icon: PieChartIcon, onClick: () => toast.info("Payment methods report") },
-    { label: "Products", icon: Package, onClick: () => toast.info("Product sales report") },
+    { label: "Sales", icon: TrendingUp, onClick: () => setView("sales") },
+    { label: "Expenses", icon: BarChart3, onClick: () => setView("expenses") },
+    { label: "Methods", icon: PieChartIcon, onClick: () => setView("methods") },
+    { label: "Products", icon: Package, onClick: () => setView("products") },
   ];
 
   const moreItems = [
-    { label: "Monthly Trends", icon: TrendingUp, onClick: () => toast.info("Monthly trends — coming soon") },
-    { label: "Customer Analysis", icon: Users, onClick: () => toast.info("Customer analysis — coming soon") },
+    { label: "Monthly Business Performance", icon: TrendingUp, onClick: () => navigate({ to: "/m/business-performance" }) },
+    { label: "Customer Analysis", icon: Users, onClick: () => navigate({ to: "/m/crm/analytics", search: { days: 30 } }) },
   ];
+
 
   return (
     <div
