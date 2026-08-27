@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { money } from "@/lib/format";
 import { SummaryStrip } from "@/components/tax/tax-workspace";
-import { useCrmIntel, marketPosition, campaignEconomics } from "@/components/crm/crm-intel-provider";
+import { useCrmIntel, marketPosition, campaignEconomics, emptyCampaignIntel } from "@/components/crm/crm-intel-provider";
 
 export const Route = createFileRoute("/_authenticated/m/crm/")({ component: CrmHub });
 
