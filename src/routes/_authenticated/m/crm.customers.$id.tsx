@@ -35,8 +35,40 @@ function ProfilePage() {
     queryFn: async () => (await supabase.from("customer_interactions").select("*").eq("customer_id", id).order("occurred_at", { ascending: false })).data ?? [],
   });
 
-  const totalPurchases = sales.filter((s: any) => s.status === "completed").reduce((a, s: any) => a + Number(s.total || 0), 0);
+  const completedSales = (sales as any[]).filter((s: any) => s.status === "completed");
+  const totalPurchases = completedSales.reduce((a, s: any) => a + Number(s.total || 0), 0);
   const lastPurchase = sales[0]?.created_at;
+  const orderCount = completedSales.length;
+  const avgOrder = orderCount > 0 ? totalPurchases / orderCount : 0;
+  const firstSale = completedSales[completedSales.length - 1];
+  const repeatCustomer = orderCount > 1;
+  const daysSinceLastPurchase = lastPurchase
+    ? Math.floor((Date.now() - new Date(lastPurchase).getTime()) / 86_400_000)
+    : null;
+
+  // Conversion is derived from real sales: the first completed sale converts the customer.
+  useEffect(() => {
+    if (!customer || !firstSale) return;
+    const record = customer as any;
+    if (record.converted_at && record.first_purchase_at) return;
+    const stage = ["prospect", "lead"].includes(record.lifecycle_stage)
+      ? "active_customer"
+      : record.lifecycle_stage;
+    supabase
+      .from("customers")
+      .update({
+        converted_at: record.converted_at ?? firstSale.created_at,
+        converted_sale_id: record.converted_sale_id ?? firstSale.id,
+        first_purchase_at: record.first_purchase_at ?? firstSale.created_at,
+        last_activity_at: lastPurchase ?? record.last_activity_at,
+        lifecycle_stage: orderCount > 1 && stage === "active_customer" ? "returning_customer" : stage,
+      })
+      .eq("id", id)
+      .then(({ error }) => {
+        if (!error) qc.invalidateQueries({ queryKey: ["crm-customer", id] });
+      });
+  }, [customer, firstSale, lastPurchase, orderCount, id, qc]);
+
 
   const [form, setForm] = useState({ name: "", phone: "", location: "", customer_type: "retail", status: "active", lifecycle_stage: "active_customer", source: "", next_follow_up: "", notes: "" });
   useEffect(() => {
