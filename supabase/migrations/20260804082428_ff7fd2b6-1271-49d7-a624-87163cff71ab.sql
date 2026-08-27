@@ -1,0 +1,1 @@
+ALTER TABLE public.tax_settings ALTER COLUMN user_id SET DEFAULT COALESCE(auth.uid(), '00000000-0000-0000-0000-000000000000'::uuid);

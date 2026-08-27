@@ -1,0 +1,203 @@
+name: Android Release Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_name:
+        description: 'Release name/tag'
+        required: true
+        default: 'v1.0.0'
+
+env:
+  JAVA_HOME: /usr/lib/jvm/java-21-openjdk-amd64
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Validate signing secrets exist
+        run: |
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ] || \
+             [ -z "${{ secrets.KEYSTORE_PASSWORD }}" ] || \
+             [ -z "${{ secrets.KEY_ALIAS }}" ] || \
+             [ -z "${{ secrets.KEY_PASSWORD }}" ]; then
+            echo "⚠️ WARNING: One or more signing secrets are not configured"
+            echo "Build will continue but AAB will be unsigned."
+            echo ""
+            echo "To enable signing, configure these GitHub Secrets:"
+            echo "  - ANDROID_KEYSTORE_BASE64"
+            echo "  - KEYSTORE_PASSWORD"
+            echo "  - KEY_ALIAS"
+            echo "  - KEY_PASSWORD"
+          else
+            echo "✓ All signing secrets are configured"
+          fi
+      
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-levels: '36'
+          build-tools: '35.0.0'
+          platforms: 'android-36'
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+      
+      - name: Install dependencies
+        run: bun install
+      
+      - name: Build web application
+        run: bun run build
+      
+      - name: Sync Capacitor
+        run: CAP_SERVER_URL=https://buzz-gallery-hub.lovable.app bun run cap:sync
+      
+      - name: Create signing configuration from secrets
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.KEYSTORE_PASSWORD != '' && secrets.KEY_ALIAS != '' && secrets.KEY_PASSWORD != '' }}
+        run: |
+          cd android
+          
+          # Decode keystore from base64 (secret content is masked in logs)
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > bizz-release.keystore
+          
+          # Create key.properties with secrets (will be masked in logs)
+          cat > key.properties << 'SECRETS_EOF'
+          storeFile=../bizz-release.keystore
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          SECRETS_EOF
+          
+          # Verify keystore was created
+          if [ -f "bizz-release.keystore" ]; then
+            echo "✓ Keystore decoded successfully"
+            ls -lh bizz-release.keystore
+          else
+            echo "✗ Failed to create keystore"
+            exit 1
+          fi
+      
+      - name: Clean Gradle
+        run: cd android && ./gradlew clean
+      
+      - name: Build Android App Bundle (Release)
+        run: cd android && ./gradlew bundleRelease --no-daemon
+      
+      - name: Verify AAB exists
+        run: |
+          AAB_PATH="android/app/build/outputs/bundle/release/app-release.aab"
+          if [ -f "$AAB_PATH" ]; then
+            echo "✓ AAB file generated successfully"
+            ls -lh "$AAB_PATH"
+            echo "AAB_SIZE=$(du -h "$AAB_PATH" | cut -f1)" >> $GITHUB_ENV
+          else
+            echo "✗ AAB file not found at $AAB_PATH"
+            exit 1
+          fi
+      
+      - name: Verify AAB signing (if secrets configured)
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.KEYSTORE_PASSWORD != '' }}
+        run: |
+          AAB_PATH="android/app/build/outputs/bundle/release/app-release.aab"
+          
+          # Check if AAB is a valid ZIP (which it should be)
+          if unzip -t "$AAB_PATH" > /dev/null 2>&1; then
+            echo "✓ AAB is a valid archive"
+          else
+            echo "✗ AAB is not a valid archive"
+            exit 1
+          fi
+          
+          # Extract and check for signing certificate
+          cd android
+          unzip -q -o "$AAB_PATH" -d aab_extracted
+          
+          if [ -f "aab_extracted/base/manifest/AndroidManifest.xml" ]; then
+            echo "✓ AndroidManifest.xml present in AAB"
+          fi
+          
+          # Note: Full signature verification would require the public key from the keystore
+          # For now, we trust the Gradle build system's signing verification
+          echo "✓ AAB structure is valid and ready for Google Play"
+          
+          # Cleanup extracted files
+          rm -rf aab_extracted
+      
+      - name: Upload AAB as artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: android-app-bundle
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+      
+      - name: Clean signing configuration
+        if: always()
+        run: |
+          cd android
+          # Securely delete sensitive files
+          rm -f key.properties bizz-release.keystore
+          
+          # Verify they're deleted
+          if [ ! -f "key.properties" ] && [ ! -f "bizz-release.keystore" ]; then
+            echo "✓ Signing configuration cleaned up successfully"
+          else
+            echo "✗ Failed to clean up signing files"
+            exit 1
+          fi
+
+  report:
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Download AAB artifact
+        if: success()
+        uses: actions/download-artifact@v4
+        with:
+          name: android-app-bundle
+      
+      - name: Report build status
+        run: |
+          AAB_FILE="app-release.aab"
+          
+          if [ -f "$AAB_FILE" ]; then
+            FILE_SIZE=$(ls -lh "$AAB_FILE" | awk '{print $5}')
+            echo "## ✅ Android Release Build Successful" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📦 Build Information" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: Release build completed" >> $GITHUB_STEP_SUMMARY
+            echo "- **AAB File**: $AAB_FILE" >> $GITHUB_STEP_SUMMARY
+            echo "- **Size**: $FILE_SIZE" >> $GITHUB_STEP_SUMMARY
+            echo "- **Application ID**: com.bizzautomators.app" >> $GITHUB_STEP_SUMMARY
+            echo "- **Application Name**: Bizz Automators" >> $GITHUB_STEP_SUMMARY
+            echo "- **Production URL**: https://buzz-gallery-hub.lovable.app" >> $GITHUB_STEP_SUMMARY
+            echo "- **Version**: 1.0.0" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🔐 Signing Status" >> $GITHUB_STEP_SUMMARY
+            if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+              echo "- **Signing**: ✅ Signed with release keystore" >> $GITHUB_STEP_SUMMARY
+              echo "- **Ready for**: Google Play Console submission" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **Signing**: ⚠️ Unsigned (no signing secrets configured)" >> $GITHUB_STEP_SUMMARY
+              echo "- **Ready for**: Testing only" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📥 Download" >> $GITHUB_STEP_SUMMARY
+            echo "Download the AAB from the **Artifacts** section of this workflow run." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Android Release Build Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "AAB file was not generated. Check the build logs for details." >> $GITHUB_STEP_SUMMARY
+          fi

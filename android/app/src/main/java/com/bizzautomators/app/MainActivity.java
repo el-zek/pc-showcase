@@ -1,0 +1,5 @@
+package com.bizzautomators.app;
+
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {}
