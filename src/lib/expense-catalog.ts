@@ -11,51 +11,60 @@ export type ExpenseGroup = {
 
 export const EXPENSE_CATALOG: ExpenseGroup[] = [
   {
-    category: "Staff & Payroll",
-    items: ["Salaries", "Wages", "Bonuses & commission", "Allowances", "Overtime", "Staff welfare", "Training", "Recruitment", "PAYE contribution", "Social security (NSSF)", "Workers compensation (WCF)", "Skills levy (SDL)"],
+    category: "Payroll and Benefits",
+    items: ["Salaries", "Wages", "Transport allowance", "Food allowance", "Overtime", "Bonuses", "Commission", "Staff welfare", "Training", "Recruitment", "Employer contributions", "PAYE contribution", "Social security (NSSF)", "Workers compensation (WCF)", "Skills levy (SDL)"],
   },
   {
-    category: "Rent & Premises",
-    items: ["Shop / office rent", "Warehouse rent", "Service charge", "Security", "Cleaning", "Repairs & maintenance", "Renovation"],
+    category: "Office and Operational Costs",
+    items: ["Equipment purchases", "Office furniture", "Computers and accessories", "Software and licenses", "ERP / system costs", "Security", "Cleaning", "Office maintenance"],
   },
   {
-    category: "Utilities",
-    items: ["Electricity", "Water", "Internet", "Airtime & data", "Gas / fuel for premises", "Waste collection"],
+    category: "Rent",
+    items: ["Office rent", "Shop rent", "Warehouse rent", "Land / property rent", "Service charge", "Renovation"],
   },
   {
-    category: "Marketing & Advertising",
-    items: ["Social media ads", "Google ads", "Radio / TV", "Printed materials (flyers, banners)", "Branding & design", "Photography & video", "Influencer / promoter", "Exhibitions & events", "Sponsorship", "Promotional giveaways", "Website & landing pages", "SMS / bulk messaging"],
+    category: "Utilities and Bills",
+    items: ["Electricity", "Water", "Internet", "Phone / airtime", "Security", "Waste collection", "Gas / fuel for premises", "Other utilities"],
   },
   {
-    category: "Transport & Logistics",
-    items: ["Fuel", "Vehicle maintenance", "Delivery & courier", "Public transport", "Vehicle insurance", "Parking & tolls", "Freight & clearing"],
+    category: "Office Supplies",
+    items: ["Printing", "Stationery", "Toner / ink", "Packaging materials", "Cleaning supplies", "Consumables", "Postage", "Refreshments"],
   },
   {
-    category: "Stock & Production",
+    category: "Maintenance and Repair",
+    items: ["Equipment repair", "Vehicle repair", "Building repair", "Computer / IT repair", "Furniture repair", "Machinery maintenance"],
+  },
+  {
+    category: "Marketing",
+    items: ["Instagram ads", "Facebook ads", "Google ads", "YouTube ads", "TikTok ads", "WhatsApp marketing", "SMS / bulk messaging", "Influencers", "Photography", "Video production", "Posters", "Flyers", "Events / exhibitions", "Sponsorship", "Promotional materials", "Branding & design", "Website & landing pages"],
+  },
+  {
+    category: "Legal and Compliance",
+    items: ["Business license", "Tax compliance", "Legal fees", "Accounting fees", "Audit fees", "Registration fees", "Permits", "Professional services", "TRA fees & penalties", "Local government levy", "Fire & safety certificate", "Health certificate", "Association fees"],
+  },
+  {
+    category: "Financial and Banking",
+    items: ["Bank charges", "Mobile money charges", "Transaction fees", "Loan interest", "Loan repayment", "Payment gateway fees", "Currency / exchange charges", "Overdraft charges", "Insurance premium"],
+  },
+  {
+    category: "Logistics",
+    items: ["Transport charges", "Fuel", "Courier services", "Delivery", "Business trips", "Accommodation", "Parking", "Tolls", "Vehicle maintenance", "Vehicle insurance", "Freight & clearing", "Public transport"],
+  },
+  {
+    category: "Platform Development",
+    items: ["Website development", "App development", "Hosting", "Domain", "Cloud services", "API services", "SMS services", "Software development", "Technical support", "IT support"],
+  },
+  {
+    category: "Stock and Production",
     items: ["Raw materials", "Packaging", "Production supplies", "Casual labour", "Spoilage & wastage", "Machinery maintenance"],
   },
   {
-    category: "Professional Services",
-    items: ["Accounting & audit", "Legal fees", "Consultancy", "IT support", "Bookkeeping software", "Bank charges", "Mobile money charges"],
-  },
-  {
-    category: "Licences & Compliance",
-    items: ["Business licence", "Sector permit", "TRA fees & penalties", "Local government levy", "Fire & safety certificate", "Health certificate", "Association fees"],
-  },
-  {
-    category: "Office & Administration",
-    items: ["Stationery", "Printing & photocopy", "Postage", "Subscriptions", "Furniture", "Small equipment", "Refreshments"],
-  },
-  {
-    category: "Equipment & Assets",
+    category: "Equipment and Assets",
     items: ["Equipment purchase", "Computers & phones", "Tools", "Software licences", "Depreciation", "Leasing"],
-  },
-  {
-    category: "Finance & Loans",
-    items: ["Loan interest", "Loan repayment", "Overdraft charges", "Insurance premium", "Forex loss"],
   },
   { category: "Other", items: ["Miscellaneous", "Donations", "Fines & penalties", "Owner drawings"] },
 ];
+
 
 export const EXPENSE_CATEGORIES = EXPENSE_CATALOG.map((g) => g.category);
 
