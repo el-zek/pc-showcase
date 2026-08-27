@@ -9,6 +9,15 @@ import { RecordDialog, ConfirmDialog, bool, num, str, type FieldValue } from "@/
 import { DetailsDrawer, StatusBadge, SummaryStrip, TaxTable, TaxWorkspace, exportCsv } from "@/components/tax/tax-workspace";
 import { EXPENSE_CATALOG, EXPENSE_FREQUENCIES, PAYMENT_METHODS, itemsForCategory, daysUntil, advanceDate, frequencyLabel } from "@/lib/expense-catalog";
 
+/** Categories where a supplier/vendor is meaningful. */
+const SUPPLIER_CATEGORIES = [
+  "Office and Operational Costs", "Office Supplies", "Maintenance and Repair",
+  "Stock and Production", "Equipment and Assets", "Platform Development", "Logistics",
+];
+const needsSupplier = (category: string) => SUPPLIER_CATEGORIES.includes(category);
+/** Campaign only matters for marketing spend. */
+const needsCampaign = (category: string) => category === "Marketing";
+
 /**
  * Single Expenses module, shared by Tax Management and Finance.
  * Same table, same logic, same UI — only the back link differs.
@@ -65,30 +74,32 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
   const openEdit = (row: ExpenseRecord) => { setEditing(row); setFormOpen(true); };
 
   const submit = (value: Record<string, FieldValue>) => {
+    const category = str(value.category);
     saveExpense(
       {
         description: str(value.description),
-        category: str(value.category),
+        category,
         date: str(value.date),
         amount: num(value.amount),
-        deductible: editing ? editing.deductible : bool(value.deductible) || true,
-        receipt: editing ? editing.receipt : Boolean(value.attachmentPath),
         item: str(value.item),
-        vatAmount: num(value.vatAmount),
-        payee: str(value.payee),
-        supplierId: str(value.supplierId).split(" — ")[0],
+        supplierId: needsSupplier(category) ? str(value.supplierId).split(" — ")[0] : "",
         paymentMethod: str(value.paymentMethod),
-        reference: str(value.reference),
         notes: str(value.notes),
-        attachmentPath: str(value.attachmentPath),
-        branch: str(value.branch),
-        campaignId: str(value.campaignId).split(" — ")[0],
+        campaignId: needsCampaign(category) ? str(value.campaignId).split(" — ")[0] : "",
         isRecurring: bool(value.isRecurring),
-        frequency: str(value.frequency),
-        nextDueDate: str(value.nextDueDate),
-        recurringParentId: str(value.recurringParentId).split(" — ")[0],
-        taxPeriod: periodOf(str(value.date)),
+        frequency: bool(value.isRecurring) ? str(value.frequency) : "one_time",
+        nextDueDate: bool(value.isRecurring) ? str(value.nextDueDate) : "",
         status: str(value.status) as ExpenseRecord["status"],
+        // Kept for data compatibility — not part of the simplified expense form.
+        deductible: editing ? editing.deductible : true,
+        receipt: editing ? editing.receipt : false,
+        vatAmount: editing?.vatAmount ?? 0,
+        payee: editing?.payee ?? "",
+        reference: editing?.reference ?? "",
+        attachmentPath: editing?.attachmentPath ?? "",
+        branch: editing?.branch ?? "",
+        recurringParentId: editing?.recurringParentId ?? "",
+        taxPeriod: periodOf(str(value.date)),
       },
       editing?.id,
     );
@@ -98,7 +109,7 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
   return (
     <TaxWorkspace
       title="Expenses"
-      subtitle="Deductible business expenses and receipts"
+      subtitle="Business spending records"
       icon={Receipt}
       {...(backTo ? { backTo } : {})}
       {...(backLabel ? { backLabel } : {})}
@@ -127,17 +138,11 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
         filter={{
           label: "Filter",
           options: [
-            { value: "deductible", label: "Deductible" },
-            { value: "non-deductible", label: "Non-deductible" },
-            { value: "no-receipt", label: "No receipt" },
             { value: "Approved", label: "Approved" },
             { value: "Pending", label: "Pending" },
+            { value: "recurring", label: "Recurring" },
           ],
-          match: (row, value) =>
-            value === "deductible" ? row.deductible
-              : value === "non-deductible" ? !row.deductible
-              : value === "no-receipt" ? !row.receipt
-              : row.status === value,
+          match: (row, value) => (value === "recurring" ? row.isRecurring : row.status === value),
         }}
         columns={[
           { key: "description", label: "Expense", render: (row) => <span className="font-medium text-white">{row.description}</span> },
@@ -153,10 +158,10 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
         onExport={(rows) =>
           exportCsv(
             "expenses.csv",
-            ["Expense", "Category", "Item", "Date", "Amount", "VAT", "Payee", "Payment method", "Reference", "Branch", "Recurring", "Status"],
+            ["Expense", "Category", "Item", "Date", "Amount", "Payment method", "Recurring", "Status"],
             rows.map((row) => [
-              row.description, row.category, row.item, row.date, row.amount, row.vatAmount, row.payee,
-              row.paymentMethod, row.reference, row.branch, row.isRecurring ? frequencyLabel(row.frequency) : "No", row.status,
+              row.description, row.category, row.item, row.date, row.amount,
+              row.paymentMethod, row.isRecurring ? frequencyLabel(row.frequency) : "No", row.status,
             ]),
           )
         }
@@ -169,7 +174,7 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
       <RecordDialog
         open={formOpen}
         title={editing ? "Edit expense" : "New expense"}
-        description="Record the expense, category and receipt status."
+        description="Simple expense entry — extra fields appear based on the category."
         submitLabel={editing ? "Update" : "Create"}
         initialValue={editing ? { ...editing } : null}
         onClose={() => setFormOpen(false)}
@@ -181,20 +186,14 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
           { name: "item", label: "Item / subcategory", type: "select", options: itemOptions, half: true },
           { name: "date", label: "Date", type: "date", required: true, half: true },
           { name: "amount", label: "Amount", type: "number", required: true, half: true },
-          { name: "vatAmount", label: "VAT amount", type: "number", defaultValue: 0, half: true },
-          { name: "payee", label: "Payee", type: "text", half: true },
-          { name: "supplierId", label: "Supplier", type: "select", options: ["", ...suppliers.map((row: any) => `${row.id} — ${row.name}`)], half: true },
           { name: "paymentMethod", label: "Payment method", type: "select", options: PAYMENT_METHODS, half: true },
-          { name: "reference", label: "Reference number", type: "text", half: true },
-          { name: "branch", label: "Branch", type: "text", half: true },
-          { name: "campaignId", label: "Campaign", type: "select", options: ["", ...campaigns.map((row: any) => `${row.id} — ${row.name}`)], half: true },
-          { name: "notes", label: "Notes", type: "text" },
-          { name: "attachmentPath", label: "Receipt / attachment", type: "text", half: true },
+          { name: "supplierId", label: "Supplier", type: "select", options: ["", ...suppliers.map((row: any) => `${row.id} — ${row.name}`)], half: true, showIf: (value) => needsSupplier(str(value.category)) },
+          { name: "campaignId", label: "Campaign", type: "select", options: ["", ...campaigns.map((row: any) => `${row.id} — ${row.name}`)], half: true, showIf: (value) => needsCampaign(str(value.category)) },
+          { name: "status", label: "Status", type: "select", options: ["Approved", "Pending"], half: true },
           { name: "isRecurring", label: "Recurring expense", type: "switch", half: true },
           { name: "frequency", label: "Frequency", type: "select", options: EXPENSE_FREQUENCIES.map((row) => row.value), half: true, showIf: (value) => bool(value.isRecurring) },
           { name: "nextDueDate", label: "Next due date", type: "date", half: true, showIf: (value) => bool(value.isRecurring) },
-          { name: "recurringParentId", label: "Recurring parent", type: "select", options: ["", ...expenses.filter((row) => row.isRecurring).map((row) => `${row.id} — ${row.description}`)], half: true, showIf: (value) => bool(value.isRecurring) },
-          { name: "status", label: "Status", type: "select", options: ["Approved", "Pending"], half: true },
+          { name: "notes", label: "Notes", type: "text" },
         ]}
       />
 
@@ -210,18 +209,11 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
                 { label: "Item / subcategory", value: detail.item || "—" },
                 { label: "Date", value: detail.date },
                 { label: "Amount", value: formatCurrency(detail.amount) },
-                { label: "VAT", value: detail.vatAmount ? formatCurrency(detail.vatAmount) : "—" },
-                { label: "Payee", value: detail.payee || "—" },
-                { label: "Supplier", value: (suppliers as any[]).find((row) => row.id === detail.supplierId)?.name ?? "—" },
                 { label: "Payment method", value: detail.paymentMethod || "—" },
-                { label: "Reference", value: detail.reference || "—" },
-                { label: "Branch", value: detail.branch || "—" },
-                { label: "Campaign", value: (campaigns as any[]).find((row) => row.id === detail.campaignId)?.name ?? "—" },
+                ...(detail.supplierId ? [{ label: "Supplier", value: (suppliers as any[]).find((row) => row.id === detail.supplierId)?.name ?? "—" }] : []),
+                ...(detail.campaignId ? [{ label: "Campaign", value: (campaigns as any[]).find((row) => row.id === detail.campaignId)?.name ?? "—" }] : []),
                 { label: "Notes", value: detail.notes || "—" },
                 { label: "Recurring", value: detail.isRecurring ? `${frequencyLabel(detail.frequency)}${detail.nextDueDate ? ` · next ${detail.nextDueDate}` : ""}` : "No" },
-                { label: "From recurring template", value: detail.recurringParentId ? (expenses.find((row) => row.id === detail.recurringParentId)?.description ?? "Yes") : "—" },
-                { label: "Deductible", value: detail.deductible ? "Yes" : "No" },
-                { label: "Receipt", value: detail.receipt || detail.attachmentPath ? "Attached" : "Missing" },
                 { label: "Status", value: <StatusBadge value={detail.status} /> },
               ]
             : []
