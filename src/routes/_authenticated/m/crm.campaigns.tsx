@@ -173,23 +173,24 @@ function CampaignsPage() {
   };
 
   const totals = useMemo(() => {
-    let cost = 0, reach = 0, leads = 0, acquired = 0, revenue = 0, active = 0;
+    let cost = 0, reach = 0, leads = 0, acquired = 0, revenue = 0, active = 0, attributed = 0, reported = 0;
     for (const c of campaigns as any[]) {
       if (c.status === "active") active += 1;
       const intel = allCampaignIntel.find((i) => i.campaignId === c.id);
-      const e = campaignEconomics(Number(c.budget || 0), intel ?? emptyCampaignIntel(c.id));
+      const e = campaignEconomics(Number(c.budget || 0), intel ?? emptyCampaignIntel(c.id), campaignAttribution(c.id));
       cost += e.cost; leads += e.leads; acquired += e.acquired; revenue += e.revenue;
+      attributed += e.attributedRevenue; reported += e.reportedRevenue;
       reach += Number(intel?.reach ?? 0);
     }
     return {
-      cost, reach, leads, acquired, revenue, active,
+      cost, reach, leads, acquired, revenue, active, attributed, reported,
       cac: acquired > 0 ? cost / acquired : 0,
       cpl: leads > 0 ? cost / leads : 0,
       conversion: leads > 0 ? (acquired / leads) * 100 : 0,
       roi: cost > 0 ? ((revenue - cost) / cost) * 100 : 0,
       roas: cost > 0 ? revenue / cost : 0,
     };
-  }, [campaigns, allCampaignIntel]);
+  }, [campaigns, allCampaignIntel, campaignAttribution]);
 
   const channelPerf = useMemo(() => {
     const map = new Map<string, { channel: string; campaigns: number; cost: number; leads: number; acquired: number; revenue: number; customers: number }>();
@@ -202,7 +203,7 @@ function CampaignsPage() {
     for (const c of campaigns as any[]) {
       const key = String(c.channel);
       const intel = allCampaignIntel.find((i) => i.campaignId === c.id) ?? emptyCampaignIntel(c.id);
-      const e = campaignEconomics(Number(c.budget || 0), intel);
+      const e = campaignEconomics(Number(c.budget || 0), intel, campaignAttribution(c.id));
       const row = map.get(key) ?? { channel: key, campaigns: 0, cost: 0, leads: 0, acquired: 0, revenue: 0, customers: byName.get(key) ?? 0 };
       row.campaigns += 1; row.cost += e.cost; row.leads += e.leads; row.acquired += e.acquired; row.revenue += e.revenue;
       map.set(key, row);
@@ -211,7 +212,8 @@ function CampaignsPage() {
       if (!map.has(name)) map.set(name, { channel: name, campaigns: 0, cost: 0, leads: 0, acquired: 0, revenue: 0, customers: count });
     }
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue || b.acquired - a.acquired);
-  }, [campaigns, channels, channelCustomers, allCampaignIntel]);
+  }, [campaigns, channels, channelCustomers, allCampaignIntel, campaignAttribution]);
+
 
   return (
     <CrmShell
