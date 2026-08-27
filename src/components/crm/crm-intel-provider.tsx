@@ -100,13 +100,41 @@ export type SharePlanItem = {
   status: "planned" | "scheduled" | "published" | "cancelled";
 };
 
+/**
+ * Real acquisition attribution for a campaign, derived from
+ * customers.acquired_campaign_id joined to that customer's completed sales.
+ * Nothing here is estimated — a sale only counts once, for the campaign that
+ * acquired its customer.
+ */
+export type CampaignAttribution = {
+  campaignId: string;
+  /** customers whose acquired_campaign_id is this campaign */
+  acquiredCustomers: number;
+  /** of those, how many have at least one completed sale */
+  convertedCustomers: number;
+  orders: number;
+  revenue: number;
+};
+
+export const emptyAttribution = (campaignId: string): CampaignAttribution => ({
+  campaignId,
+  acquiredCustomers: 0,
+  convertedCustomers: 0,
+  orders: 0,
+  revenue: 0,
+});
+
 type State = {
   audiences: MarketAudience[];
   campaigns: CampaignIntel[];
   sharePlan: SharePlanItem[];
+  attribution: CampaignAttribution[];
+  /** revenue from completed sales with no campaign-acquired customer */
+  unattributedRevenue: number;
 };
 
-const EMPTY: State = { audiences: [], campaigns: [], sharePlan: [] };
+const EMPTY: State = { audiences: [], campaigns: [], sharePlan: [], attribution: [], unattributedRevenue: 0 };
+
 
 export const emptyCampaignIntel = (campaignId: string): CampaignIntel => ({
   campaignId,
