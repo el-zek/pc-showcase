@@ -8,7 +8,6 @@ import {
   BarChart3, TrendingUp, PieChart as PieChartIcon, Package,
   Home, Scan, Users, MoreHorizontal, ChevronRight, ShoppingCart,
 } from "lucide-react";
-import { toast } from "sonner";
 import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell, Legend } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/m/reports")({ component: Reports });
