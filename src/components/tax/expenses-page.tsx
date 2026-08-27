@@ -42,6 +42,12 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
   const upcoming = expenses.filter((row) => row.isRecurring && row.nextDueDate && daysUntil(row.nextDueDate) <= 30).sort((a, b) => a.nextDueDate.localeCompare(b.nextDueDate));
   const createOccurrence = async (template: ExpenseRecord) => {
     if (!template.nextDueDate) return;
+    // Duplicate prevention: never create a second occurrence for the same template + due date.
+    const already = expenses.some((row) => row.recurringParentId === template.id && row.date === template.nextDueDate);
+    if (already) {
+      toast.info("An occurrence for this due date already exists");
+      return;
+    }
     saveExpense({
       description: template.description, category: template.category, item: template.item, date: template.nextDueDate,
       amount: template.amount, vatAmount: template.vatAmount, payee: template.payee, supplierId: template.supplierId,
@@ -51,8 +57,9 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
     });
     await supabase.from("tax_expenses").update({ next_due_date: advanceDate(template.nextDueDate, template.frequency) }).eq("id", template.id);
     await refresh();
-    toast.success("Pending expense created for confirmation");
+    toast.success("Pending expense created — confirm it to approve the payment");
   };
+
 
   const openCreate = () => { setEditing(null); setFormOpen(true); };
   const openEdit = (row: ExpenseRecord) => { setEditing(row); setFormOpen(true); };
