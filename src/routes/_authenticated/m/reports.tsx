@@ -1,12 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+
 import { supabase } from "@/integrations/supabase/client";
 import { money } from "@/lib/format";
 import {
   BarChart3, TrendingUp, PieChart as PieChartIcon, Package,
   Home, Scan, Users, MoreHorizontal, ChevronRight, ShoppingCart,
 } from "lucide-react";
-import { toast } from "sonner";
 import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell, Legend } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/m/reports")({ component: Reports });
@@ -130,23 +131,83 @@ function Reports() {
           </ul>
         </div>
 
-        {/* Sales vs Expenses Card */}
-        <button
-          onClick={() => toast.info("View detailed analytics")}
-          className="mt-4 flex w-full items-center gap-3 rounded-2xl bg-white/15 backdrop-blur-xl p-5 text-left transition hover:scale-[1.02] hover:bg-white/25 border border-white/30"
-        >
-          <div className="grid h-12 w-12 place-items-center rounded-xl border border-amber-300/30 bg-amber-400/15 backdrop-blur">
-            <TrendingUp className="h-6 w-6 text-amber-400" />
+        {/* Live report panel driven by the selected card */}
+        <div className="mt-4 rounded-3xl border border-white/30 bg-white/10 p-5 backdrop-blur-xl">
+          <div className="flex items-center gap-2">
+            <div className="grid h-10 w-10 place-items-center rounded-xl border border-amber-300/30 bg-amber-400/15">
+              <TrendingUp className="h-5 w-5 text-amber-400" />
+            </div>
+            <div>
+              <h3 className="font-display text-lg font-bold text-white">
+                {view === "sales" ? "Sales — last 6 months"
+                  : view === "expenses" ? "Expenses — last 6 months"
+                  : view === "methods" ? "Revenue by payment method"
+                  : "Top products by revenue"}
+              </h3>
+              <p className="text-xs text-white/70">Live figures from your records</p>
+            </div>
           </div>
-          <div className="flex-1">
-            <h3 className="font-display text-lg font-bold text-white">Last 6 Months</h3>
-            <p className="text-xs text-white/70">Sales vs Expenses trends</p>
+
+          <div className="mt-4 h-64">
+            {view === "methods" ? (
+              (data?.methods.length ?? 0) === 0 ? <Empty /> : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={data?.methods ?? []} dataKey="value" nameKey="name" outerRadius={90} label>
+                      {(data?.methods ?? []).map((_, i) => (
+                        <Cell key={i} fill={["#fbbf24", "#38bdf8", "#34d399", "#f472b6", "#a78bfa"][i % 5]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: any) => money(Number(v))} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              )
+            ) : view === "products" ? (
+              (data?.topProducts.length ?? 0) === 0 ? <Empty /> : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data?.topProducts ?? []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 10 }} />
+                    <YAxis tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 10 }} />
+                    <Tooltip formatter={(v: any) => money(Number(v))} />
+                    <Bar dataKey="total" fill="#fbbf24" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )
+            ) : view === "expenses" && (data?.expenseCategories.length ?? 0) > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data?.expenseCategories ?? []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                  <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 10 }} />
+                  <YAxis tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 10 }} />
+                  <Tooltip formatter={(v: any) => money(Number(v))} />
+                  <Bar dataKey="total" fill="#f87171" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data?.months ?? []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                  <XAxis dataKey="month" tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 10 }} />
+                  <YAxis tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 10 }} />
+                  <Tooltip formatter={(v: any) => money(Number(v))} />
+                  <Legend />
+                  <Bar dataKey="sales" name="Sales" fill="#34d399" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="expenses" name="Expenses" fill="#f87171" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
-          <ChevronRight className="h-5 w-5 text-white/60" />
-        </button>
+        </div>
+
       </div>
 
     </div>
   );
 }
 
+
+function Empty() {
+  return <div className="grid h-full place-items-center text-sm text-white/55">No data recorded yet.</div>;
+}
