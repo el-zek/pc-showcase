@@ -9,6 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ModernDialog, panelControlCls, panelLabelCls } from "@/components/ui/modern-dialog";
 
 
+/** Sentinel for the "no selection" option — Radix rejects empty item values. */
+const NONE = "__none__";
+
 export type FieldValue = string | number | boolean;
 
 export type Field = {
