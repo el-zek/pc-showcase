@@ -74,7 +74,7 @@ function ProfilePage() {
         converted_sale_id: record.converted_sale_id ?? firstSale.id,
         first_purchase_at: record.first_purchase_at ?? firstSale.created_at,
         last_activity_at: lastPurchase ?? record.last_activity_at,
-        lifecycle_stage: orderCount > 1 && stage === "active_customer" ? "returning_customer" : stage,
+        lifecycle_stage: nextStage,
       })
       .eq("id", id)
       .then(({ error }) => {
