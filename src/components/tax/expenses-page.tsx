@@ -207,10 +207,21 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
           detail
             ? [
                 { label: "Category", value: detail.category },
+                { label: "Item / subcategory", value: detail.item || "—" },
                 { label: "Date", value: detail.date },
                 { label: "Amount", value: formatCurrency(detail.amount) },
+                { label: "VAT", value: detail.vatAmount ? formatCurrency(detail.vatAmount) : "—" },
+                { label: "Payee", value: detail.payee || "—" },
+                { label: "Supplier", value: (suppliers as any[]).find((row) => row.id === detail.supplierId)?.name ?? "—" },
+                { label: "Payment method", value: detail.paymentMethod || "—" },
+                { label: "Reference", value: detail.reference || "—" },
+                { label: "Branch", value: detail.branch || "—" },
+                { label: "Campaign", value: (campaigns as any[]).find((row) => row.id === detail.campaignId)?.name ?? "—" },
+                { label: "Notes", value: detail.notes || "—" },
+                { label: "Recurring", value: detail.isRecurring ? `${frequencyLabel(detail.frequency)}${detail.nextDueDate ? ` · next ${detail.nextDueDate}` : ""}` : "No" },
+                { label: "From recurring template", value: detail.recurringParentId ? (expenses.find((row) => row.id === detail.recurringParentId)?.description ?? "Yes") : "—" },
                 { label: "Deductible", value: detail.deductible ? "Yes" : "No" },
-                { label: "Receipt", value: detail.receipt ? "Attached" : "Missing" },
+                { label: "Receipt", value: detail.receipt || detail.attachmentPath ? "Attached" : "Missing" },
                 { label: "Status", value: <StatusBadge value={detail.status} /> },
               ]
             : []
@@ -218,12 +229,24 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
         footer={
           detail ? (
             <>
+              {detail.status === "Pending" ? (
+                <Button
+                  className="bg-emerald-500 text-black hover:bg-emerald-400"
+                  onClick={() => {
+                    const { id, ...rest } = detail;
+                    saveExpense({ ...rest, status: "Approved" }, id);
+                    setDetail(null);
+                    toast.success("Expense confirmed");
+                  }}
+                >Confirm expense</Button>
+              ) : null}
               <Button variant="outline" className="border-white/15 bg-white/5 text-white hover:bg-white/15" onClick={() => { openEdit(detail); setDetail(null); }}>Edit</Button>
               <Button className="bg-rose-500 text-white hover:bg-rose-400" onClick={() => { setPendingDelete(detail); setDetail(null); }}>Delete</Button>
             </>
           ) : null
         }
       />
+
 
       <ConfirmDialog
         open={Boolean(pendingDelete)}
