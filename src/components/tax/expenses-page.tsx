@@ -180,7 +180,7 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
       <RecordDialog
         open={formOpen}
         title={editing ? "Edit expense" : "New expense"}
-        description="Record the expense, category and receipt status."
+        description="Simple expense entry — extra fields appear based on the category."
         submitLabel={editing ? "Update" : "Create"}
         initialValue={editing ? { ...editing } : null}
         onClose={() => setFormOpen(false)}
@@ -192,20 +192,14 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
           { name: "item", label: "Item / subcategory", type: "select", options: itemOptions, half: true },
           { name: "date", label: "Date", type: "date", required: true, half: true },
           { name: "amount", label: "Amount", type: "number", required: true, half: true },
-          { name: "vatAmount", label: "VAT amount", type: "number", defaultValue: 0, half: true },
-          { name: "payee", label: "Payee", type: "text", half: true },
-          { name: "supplierId", label: "Supplier", type: "select", options: ["", ...suppliers.map((row: any) => `${row.id} — ${row.name}`)], half: true },
           { name: "paymentMethod", label: "Payment method", type: "select", options: PAYMENT_METHODS, half: true },
-          { name: "reference", label: "Reference number", type: "text", half: true },
-          { name: "branch", label: "Branch", type: "text", half: true },
-          { name: "campaignId", label: "Campaign", type: "select", options: ["", ...campaigns.map((row: any) => `${row.id} — ${row.name}`)], half: true },
-          { name: "notes", label: "Notes", type: "text" },
-          { name: "attachmentPath", label: "Receipt / attachment", type: "text", half: true },
+          { name: "supplierId", label: "Supplier", type: "select", options: ["", ...suppliers.map((row: any) => `${row.id} — ${row.name}`)], half: true, showIf: (value) => needsSupplier(str(value.category)) },
+          { name: "campaignId", label: "Campaign", type: "select", options: ["", ...campaigns.map((row: any) => `${row.id} — ${row.name}`)], half: true, showIf: (value) => needsCampaign(str(value.category)) },
+          { name: "status", label: "Status", type: "select", options: ["Approved", "Pending"], half: true },
           { name: "isRecurring", label: "Recurring expense", type: "switch", half: true },
           { name: "frequency", label: "Frequency", type: "select", options: EXPENSE_FREQUENCIES.map((row) => row.value), half: true, showIf: (value) => bool(value.isRecurring) },
           { name: "nextDueDate", label: "Next due date", type: "date", half: true, showIf: (value) => bool(value.isRecurring) },
-          { name: "recurringParentId", label: "Recurring parent", type: "select", options: ["", ...expenses.filter((row) => row.isRecurring).map((row) => `${row.id} — ${row.description}`)], half: true, showIf: (value) => bool(value.isRecurring) },
-          { name: "status", label: "Status", type: "select", options: ["Approved", "Pending"], half: true },
+          { name: "notes", label: "Notes", type: "text" },
         ]}
       />
 
