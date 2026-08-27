@@ -109,7 +109,7 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
   return (
     <TaxWorkspace
       title="Expenses"
-      subtitle="Deductible business expenses and receipts"
+      subtitle="Business spending records"
       icon={Receipt}
       {...(backTo ? { backTo } : {})}
       {...(backLabel ? { backLabel } : {})}
