@@ -548,7 +548,7 @@ function CampaignsPage() {
             {resultsFor ? (
               <div className="md:col-span-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {(() => {
-                  const e = campaignEconomics(Number(resultsFor.budget || 0), results);
+                  const e = campaignEconomics(Number(resultsFor.budget || 0), results, campaignAttribution(resultsFor.id));
                   return (
                     <>
                       <Mini label="CPL" value={e.cpl > 0 ? money(e.cpl) : "—"} />

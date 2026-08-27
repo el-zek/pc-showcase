@@ -52,9 +52,8 @@ function MarketPage() {
   const economics = useMemo(() => {
     let cost = 0, leads = 0, acquired = 0, revenue = 0;
     for (const c of campaigns as any[]) {
-      const intel = allCampaignIntel.find((i) => i.campaignId === c.id);
-      if (!intel) { cost += Number(c.budget || 0); continue; }
-      const e = campaignEconomics(Number(c.budget || 0), intel);
+      const intel = allCampaignIntel.find((i) => i.campaignId === c.id) ?? emptyCampaignIntel(c.id);
+      const e = campaignEconomics(Number(c.budget || 0), intel, campaignAttribution(c.id));
       cost += e.cost; leads += e.leads; acquired += e.acquired; revenue += e.revenue;
     }
     const buyers = new Set((sales as any[]).map((s) => s.customer_id).filter(Boolean));
