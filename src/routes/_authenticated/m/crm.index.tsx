@@ -4,13 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { money } from "@/lib/format";
 import { SummaryStrip } from "@/components/tax/tax-workspace";
-import { useCrmIntel, marketPosition, campaignEconomics } from "@/components/crm/crm-intel-provider";
+import { useCrmIntel, marketPosition, campaignEconomics, emptyCampaignIntel } from "@/components/crm/crm-intel-provider";
 
 export const Route = createFileRoute("/_authenticated/m/crm/")({ component: CrmHub });
 
 function CrmHub() {
   const navigate = useNavigate();
-  const { market, allCampaignIntel } = useCrmIntel();
+  const { market, allCampaignIntel, campaignAttribution } = useCrmIntel();
 
   const { data: stats } = useQuery({
     queryKey: ["crm-hub-stats"],
@@ -43,9 +43,8 @@ function CrmHub() {
     let cost = 0, acquired = 0, revenue = 0, active = 0;
     for (const c of (stats?.campaigns ?? []) as any[]) {
       if (c.status === "active") active += 1;
-      const intel = allCampaignIntel.find((i) => i.campaignId === c.id);
-      if (!intel) { cost += Number(c.budget || 0); continue; }
-      const e = campaignEconomics(Number(c.budget || 0), intel);
+      const intel = allCampaignIntel.find((i) => i.campaignId === c.id) ?? emptyCampaignIntel(c.id);
+      const e = campaignEconomics(Number(c.budget || 0), intel, campaignAttribution(c.id));
       cost += e.cost; acquired += e.acquired; revenue += e.revenue;
     }
     return {

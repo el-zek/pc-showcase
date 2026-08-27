@@ -238,6 +238,15 @@ function CampaignsPage() {
         ]}
       />
 
+      {/* Attribution is never inferred: only sales of customers whose acquisition
+          campaign is recorded count as directly attributed. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Mini label="Directly attributed revenue" value={money(totals.attributed)} />
+        <Mini label="Manually reported revenue" value={money(totals.reported)} />
+        <Mini label="Unattributed revenue" value={money(unattributedRevenue)} />
+      </div>
+
+
       {/* sub-navigation (channels live here, not in main navigation) */}
       <div className="flex flex-wrap gap-2">
         {TABS.map((t) => (
@@ -268,7 +277,9 @@ function CampaignsPage() {
           ) : null}
           {(campaigns as any[]).map((c) => {
             const intel = campaignIntel(c.id);
-            const e = campaignEconomics(Number(c.budget || 0), intel);
+            const attribution = campaignAttribution(c.id);
+            const e = campaignEconomics(Number(c.budget || 0), intel, attribution);
+
             return (
               <GlassCard key={c.id} className="p-4">
                 <div className="flex items-start gap-3">
@@ -291,7 +302,12 @@ function CampaignsPage() {
                       <Mini label="Acquired" value={e.acquired.toLocaleString()} />
                       <Mini label="CAC" value={e.cac > 0 ? money(e.cac) : "—"} />
                       <Mini label="ROAS" value={e.cost > 0 ? `${e.roas.toFixed(2)}x` : "—"} />
+                      <Mini label="Attributed revenue" value={money(e.attributedRevenue)} />
+                      <Mini label="Attributed orders" value={e.attributedOrders.toLocaleString()} />
+                      <Mini label="Reported revenue" value={e.reportedRevenue > 0 ? money(e.reportedRevenue) : "—"} />
+                      <Mini label="ROI" value={e.cost > 0 ? `${e.roi.toFixed(0)}%` : "—"} />
                     </div>
+
                   </div>
                 </div>
                 <div className="mt-3 flex items-center gap-2 border-t border-white/10 pt-3">
@@ -532,7 +548,7 @@ function CampaignsPage() {
             {resultsFor ? (
               <div className="md:col-span-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {(() => {
-                  const e = campaignEconomics(Number(resultsFor.budget || 0), results);
+                  const e = campaignEconomics(Number(resultsFor.budget || 0), results, campaignAttribution(resultsFor.id));
                   return (
                     <>
                       <Mini label="CPL" value={e.cpl > 0 ? money(e.cpl) : "—"} />

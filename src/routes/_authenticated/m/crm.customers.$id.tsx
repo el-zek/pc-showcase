@@ -30,6 +30,11 @@ function ProfilePage() {
     queryKey: ["crm-customer-sales", id],
     queryFn: async () => (await supabase.from("sales").select("id,invoice_number,total,created_at,status,payment_method").eq("customer_id", id).order("created_at", { ascending: false })).data ?? [],
   });
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ["crm-campaign-options"],
+    queryFn: async () =>
+      (await supabase.from("marketing_campaigns").select("id,name,channel").order("created_at", { ascending: false })).data ?? [],
+  });
   const { data: interactions = [] } = useQuery({
     queryKey: ["crm-customer-interactions", id],
     queryFn: async () => (await supabase.from("customer_interactions").select("*").eq("customer_id", id).order("occurred_at", { ascending: false })).data ?? [],
@@ -50,10 +55,18 @@ function ProfilePage() {
   useEffect(() => {
     if (!customer || !firstSale) return;
     const record = customer as any;
-    if (record.converted_at && record.first_purchase_at) return;
     const stage = ["prospect", "lead"].includes(record.lifecycle_stage)
       ? "active_customer"
       : record.lifecycle_stage;
+    const nextStage = orderCount > 1 && stage === "active_customer" ? "returning_customer" : stage;
+    // Nothing to sync once conversion, first purchase, recency and stage already match reality.
+    if (
+      record.converted_at &&
+      record.first_purchase_at &&
+      record.lifecycle_stage === nextStage &&
+      record.last_activity_at === (lastPurchase ?? record.last_activity_at)
+    ) return;
+
     supabase
       .from("customers")
       .update({
@@ -61,7 +74,7 @@ function ProfilePage() {
         converted_sale_id: record.converted_sale_id ?? firstSale.id,
         first_purchase_at: record.first_purchase_at ?? firstSale.created_at,
         last_activity_at: lastPurchase ?? record.last_activity_at,
-        lifecycle_stage: orderCount > 1 && stage === "active_customer" ? "returning_customer" : stage,
+        lifecycle_stage: nextStage,
       })
       .eq("id", id)
       .then(({ error }) => {
@@ -70,7 +83,7 @@ function ProfilePage() {
   }, [customer, firstSale, lastPurchase, orderCount, id, qc]);
 
 
-  const [form, setForm] = useState({ name: "", phone: "", location: "", customer_type: "retail", status: "active", lifecycle_stage: "active_customer", source: "", next_follow_up: "", notes: "" });
+  const [form, setForm] = useState({ name: "", phone: "", location: "", customer_type: "retail", status: "active", lifecycle_stage: "active_customer", source: "", next_follow_up: "", notes: "", acquired_campaign_id: "" });
   useEffect(() => {
     if (customer) setForm({
       name: customer.name ?? "",
@@ -82,6 +95,7 @@ function ProfilePage() {
       source: (customer as any).source ?? "",
       next_follow_up: (customer as any).next_follow_up ?? "",
       notes: (customer as any).notes ?? "",
+      acquired_campaign_id: (customer as any).acquired_campaign_id ?? "",
     });
   }, [customer]);
 
@@ -97,6 +111,7 @@ function ProfilePage() {
         source: form.source || null,
         next_follow_up: form.next_follow_up || null,
         notes: form.notes || null,
+        acquired_campaign_id: form.acquired_campaign_id || null,
       }).eq("id", id);
       if (error) throw error;
     },
@@ -157,7 +172,15 @@ function ProfilePage() {
             {customer?.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-amber-400" /> {customer.phone}</div>}
             {(customer as any)?.location && <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-amber-400" /> {(customer as any).location}</div>}
             {customer?.address && <div className="text-white/70">{customer.address}</div>}
-            <div className="flex flex-wrap gap-2 text-xs text-white/60"><span>Stage: {(customer as any)?.lifecycle_stage ?? "active_customer"}</span><span>Source: {(customer as any)?.source || "Not recorded"}</span></div>
+            <div className="flex flex-wrap gap-2 text-xs text-white/60">
+              <span>Stage: {(customer as any)?.lifecycle_stage ?? "active_customer"}</span>
+              <span>Source: {(customer as any)?.source || "Not recorded"}</span>
+              <span>
+                Campaign: {(campaigns as any[]).find((c) => c.id === (customer as any)?.acquired_campaign_id)?.name ?? "Not attributed"}
+              </span>
+              {(customer as any)?.converted_at ? <span>Converted: {dateFmt.format(new Date((customer as any).converted_at))}</span> : null}
+            </div>
+
             {(customer as any)?.notes && <p className="text-sm text-white/70">{(customer as any).notes}</p>}
           </div>
         </GlassCard>
@@ -253,7 +276,14 @@ function ProfilePage() {
           <Field label="Lifecycle stage"><select value={form.lifecycle_stage} onChange={(e) => setForm({ ...form, lifecycle_stage: e.target.value })} className={inputCls}>{LIFECYCLE.map((stage) => <option key={stage}>{stage}</option>)}</select></Field>
           <Field label="Source"><select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} className={inputCls}><option value="">Not recorded</option>{SOURCES.map((source) => <option key={source}>{source}</option>)}</select></Field>
           <Field label="Next follow-up"><input type="date" value={form.next_follow_up} onChange={(e) => setForm({ ...form, next_follow_up: e.target.value })} className={inputCls} /></Field>
+          <Field label="Acquired through campaign">
+            <select value={form.acquired_campaign_id} onChange={(e) => setForm({ ...form, acquired_campaign_id: e.target.value })} className={inputCls}>
+              <option value="">Not acquired through a campaign</option>
+              {(campaigns as any[]).map((c) => <option key={c.id} value={c.id}>{c.name} ({c.channel})</option>)}
+            </select>
+          </Field>
           <Field label="Notes"><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputCls} /></Field>
+
         </div>
       </TopDrawer>
     </CrmShell>

@@ -36,6 +36,18 @@ function CustomersPage() {
     if (search.new) setDrawerOpen(true);
   }, [search.new]);
 
+  // Acquisition sources: campaigns and channels the business already has.
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ["crm-campaign-options"],
+    queryFn: async () =>
+      (await supabase.from("marketing_campaigns").select("id,name,channel,status").order("created_at", { ascending: false })).data ?? [],
+  });
+  const { data: channels = [] } = useQuery({
+    queryKey: ["crm-channel-options"],
+    queryFn: async () =>
+      (await supabase.from("customer_channels").select("id,name").eq("active", true).order("name")).data ?? [],
+  });
+
   const { data: customers = [] } = useQuery({
     queryKey: ["crm-customers"],
     queryFn: async () => {
@@ -61,6 +73,7 @@ function CustomersPage() {
 
   const [form, setForm] = useState({
     name: "", phone: "", location: "", customer_type: "retail", status: "active", lifecycle_stage: "prospect", source: "",
+    acquired_campaign_id: "", channel_id: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -78,6 +91,10 @@ function CustomersPage() {
         status: form.status,
         lifecycle_stage: form.lifecycle_stage,
         source: form.source || null,
+        // Attribution is only recorded when the user explicitly names the campaign.
+        acquired_campaign_id: form.acquired_campaign_id || null,
+        channel_id: form.channel_id || null,
+        first_interaction_at: new Date().toISOString(),
       }).select().single();
       if (error) throw error;
       return data;
@@ -88,7 +105,7 @@ function CustomersPage() {
       qc.invalidateQueries({ queryKey: ["crm-customers-all"] });
       qc.invalidateQueries({ queryKey: ["crm-hub-stats"] });
       setDrawerOpen(false);
-      setForm({ name: "", phone: "", location: "", customer_type: "retail", status: "active", lifecycle_stage: "prospect", source: "" });
+      setForm({ name: "", phone: "", location: "", customer_type: "retail", status: "active", lifecycle_stage: "prospect", source: "", acquired_campaign_id: "", channel_id: "" });
       navigate({ to: "/m/crm/customers", search: {} });
     },
     onError: (e: any) => e?.message !== "validation" && toast.error(e?.message ?? "Failed"),
@@ -247,6 +264,21 @@ function CustomersPage() {
               <option value="">Not recorded</option>{SOURCES.map((source) => <option key={source}>{source}</option>)}
             </select>
           </Field>
+          <Field label="Channel">
+            <select value={form.channel_id} onChange={(e) => setForm({ ...form, channel_id: e.target.value })} className={inputCls}>
+              <option value="">Not recorded</option>
+              {(channels as any[]).map((ch) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Acquired through campaign">
+            <select value={form.acquired_campaign_id} onChange={(e) => setForm({ ...form, acquired_campaign_id: e.target.value })} className={inputCls}>
+              <option value="">Not acquired through a campaign</option>
+              {(campaigns as any[]).map((c) => <option key={c.id} value={c.id}>{c.name} ({c.channel})</option>)}
+            </select>
+          </Field>
+          <p className="md:col-span-2 -mt-1 text-xs text-white/45">
+            Source is where the customer came from. Campaign is the specific campaign that acquired them — leave it empty when it is unknown, so revenue stays unattributed.
+          </p>
         </div>
       </TopDrawer>
     </CrmShell>

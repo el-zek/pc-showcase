@@ -8,7 +8,7 @@ import { CrmShell, GlassCard } from "@/components/crm/crm-shell";
 import { SummaryStrip, StatusBadge, TaxEmptyState } from "@/components/tax/tax-workspace";
 import { TopDrawer, Field, inputCls } from "@/components/crm/top-drawer";
 import {
-  useCrmIntel, marketPosition, campaignEconomics, opportunityLevel,
+  useCrmIntel, marketPosition, campaignEconomics, opportunityLevel, emptyCampaignIntel,
   type MarketAudience,
 } from "@/components/crm/crm-intel-provider";
 
@@ -28,7 +28,7 @@ type Form = { name: string; region: string; available: number; reach: number; ch
 const empty: Form = { name: "", region: "", available: 0, reach: 0, channels: "", notes: "" };
 
 function MarketPage() {
-  const { audiences, market, saveAudience, removeAudience, allCampaignIntel } = useCrmIntel();
+  const { audiences, market, saveAudience, removeAudience, allCampaignIntel, campaignAttribution } = useCrmIntel();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<MarketAudience | null>(null);
   const [form, setForm] = useState<Form>(empty);
@@ -52,9 +52,8 @@ function MarketPage() {
   const economics = useMemo(() => {
     let cost = 0, leads = 0, acquired = 0, revenue = 0;
     for (const c of campaigns as any[]) {
-      const intel = allCampaignIntel.find((i) => i.campaignId === c.id);
-      if (!intel) { cost += Number(c.budget || 0); continue; }
-      const e = campaignEconomics(Number(c.budget || 0), intel);
+      const intel = allCampaignIntel.find((i) => i.campaignId === c.id) ?? emptyCampaignIntel(c.id);
+      const e = campaignEconomics(Number(c.budget || 0), intel, campaignAttribution(c.id));
       cost += e.cost; leads += e.leads; acquired += e.acquired; revenue += e.revenue;
     }
     const buyers = new Set((sales as any[]).map((s) => s.customer_id).filter(Boolean));
