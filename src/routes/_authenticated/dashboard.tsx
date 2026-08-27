@@ -63,10 +63,13 @@ function Dashboard() {
     queryFn: async () => {
       const today = new Date().toISOString().slice(0, 10);
       const { data } = await supabase
-        .from("expenses")
-        .select("amount")
-        .eq("expense_date", today);
-      return (data ?? []).reduce((s: number, r: any) => s + Number(r.amount ?? 0), 0);
+        .from("tax_expenses")
+        .select("amount,status")
+        .eq("date", today);
+      return (data ?? [])
+        .filter((r: any) => r.status !== "Pending")
+        .reduce((s: number, r: any) => s + Number(r.amount ?? 0), 0);
+
     },
     refetchInterval: 30000,
   });
