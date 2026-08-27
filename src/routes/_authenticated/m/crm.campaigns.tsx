@@ -49,7 +49,7 @@ const empty: Form = {
 
 function CampaignsPage() {
   const qc = useQueryClient();
-  const { audiences, campaignIntel, allCampaignIntel, saveCampaignIntel, sharePlan, saveSharePlanItem, removeSharePlanItem } = useCrmIntel();
+  const { audiences, campaignIntel, allCampaignIntel, campaignAttribution, unattributedRevenue, saveCampaignIntel, sharePlan, saveSharePlanItem, removeSharePlanItem } = useCrmIntel();
   const [tab, setTab] = useState<TabKey>("campaigns");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
