@@ -138,17 +138,11 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
         filter={{
           label: "Filter",
           options: [
-            { value: "deductible", label: "Deductible" },
-            { value: "non-deductible", label: "Non-deductible" },
-            { value: "no-receipt", label: "No receipt" },
             { value: "Approved", label: "Approved" },
             { value: "Pending", label: "Pending" },
+            { value: "recurring", label: "Recurring" },
           ],
-          match: (row, value) =>
-            value === "deductible" ? row.deductible
-              : value === "non-deductible" ? !row.deductible
-              : value === "no-receipt" ? !row.receipt
-              : row.status === value,
+          match: (row, value) => (value === "recurring" ? row.isRecurring : row.status === value),
         }}
         columns={[
           { key: "description", label: "Expense", render: (row) => <span className="font-medium text-white">{row.description}</span> },
