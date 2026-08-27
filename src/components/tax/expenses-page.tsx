@@ -142,6 +142,7 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
         columns={[
           { key: "description", label: "Expense", render: (row) => <span className="font-medium text-white">{row.description}</span> },
           { key: "category", label: "Category" },
+          { key: "item", label: "Item", hideOnMobile: true, render: (row) => row.item || "—" },
           { key: "date", label: "Date", hideOnMobile: true },
           { key: "amount", label: "Amount", render: (row) => formatCurrency(row.amount) },
           { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
@@ -152,10 +153,14 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
         onExport={(rows) =>
           exportCsv(
             "expenses.csv",
-            ["Expense", "Category", "Date", "Amount", "Status"],
-            rows.map((row) => [row.description, row.category, row.date, row.amount, row.status]),
+            ["Expense", "Category", "Item", "Date", "Amount", "VAT", "Payee", "Payment method", "Reference", "Branch", "Recurring", "Status"],
+            rows.map((row) => [
+              row.description, row.category, row.item, row.date, row.amount, row.vatAmount, row.payee,
+              row.paymentMethod, row.reference, row.branch, row.isRecurring ? frequencyLabel(row.frequency) : "No", row.status,
+            ]),
           )
         }
+
         addLabel="New expense"
         onAdd={openCreate}
         empty={{ title: "No expenses recorded", description: "Log business expenses to reduce your taxable profit.", icon: Receipt }}
