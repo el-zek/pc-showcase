@@ -153,6 +153,9 @@ type Ctx = {
   audiences: MarketAudience[];
   campaignIntel: (campaignId: string) => CampaignIntel;
   allCampaignIntel: CampaignIntel[];
+  campaignAttribution: (campaignId: string) => CampaignAttribution;
+  allAttribution: CampaignAttribution[];
+  unattributedRevenue: number;
   sharePlan: SharePlanItem[];
   saveAudience: (row: Omit<MarketAudience, "id"> & { id?: string }) => void;
   removeAudience: (id: string) => void;
@@ -160,6 +163,7 @@ type Ctx = {
   saveSharePlanItem: (row: Omit<SharePlanItem, "id"> & { id?: string }) => void;
   removeSharePlanItem: (id: string) => void;
   market: { available: number; reach: number };
+  refresh: () => Promise<void>;
 };
 
 const CrmIntelContext = createContext<Ctx | null>(null);
@@ -168,12 +172,46 @@ export function CrmIntelProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(EMPTY);
 
   const refresh = useCallback(async () => {
-    const [audiences, campaigns, sharePlan] = await Promise.all([
+    const [audiences, campaigns, sharePlan, customers, sales] = await Promise.all([
       supabase.from("market_audiences").select("*").order("created_at", { ascending: false }),
       supabase.from("campaign_results").select("*"),
       supabase.from("campaign_share_plan").select("*, market_audiences(name)").order("publish_date"),
+      supabase.from("customers").select("id,acquired_campaign_id"),
+      supabase.from("sales").select("id,customer_id,total,status").eq("status", "completed"),
     ]);
     const audienceRows = audiences.data ?? [];
+
+    // Attribution: a completed sale belongs to the campaign that acquired its
+    // customer. Sales without such a customer stay unattributed.
+    const campaignByCustomer = new Map<string, string>();
+    const attribution = new Map<string, CampaignAttribution>();
+    for (const row of (customers.data ?? []) as any[]) {
+      if (!row.acquired_campaign_id) continue;
+      campaignByCustomer.set(row.id, row.acquired_campaign_id);
+      const entry = attribution.get(row.acquired_campaign_id) ?? emptyAttribution(row.acquired_campaign_id);
+      entry.acquiredCustomers += 1;
+      attribution.set(row.acquired_campaign_id, entry);
+    }
+    const convertedSeen = new Set<string>();
+    let unattributedRevenue = 0;
+    for (const sale of (sales.data ?? []) as any[]) {
+      const campaignId = sale.customer_id ? campaignByCustomer.get(sale.customer_id) : undefined;
+      const total = Number(sale.total || 0);
+      if (!campaignId) {
+        unattributedRevenue += total;
+        continue;
+      }
+      const entry = attribution.get(campaignId) ?? emptyAttribution(campaignId);
+      entry.orders += 1;
+      entry.revenue += total;
+      const key = `${campaignId}:${sale.customer_id}`;
+      if (!convertedSeen.has(key)) {
+        convertedSeen.add(key);
+        entry.convertedCustomers += 1;
+      }
+      attribution.set(campaignId, entry);
+    }
+
     setState({
       audiences: audienceRows.map((row: any) => ({
         id: row.id, name: row.name, region: row.region ?? "", available: Number(row.available_customers ?? 0),
@@ -190,8 +228,11 @@ export function CrmIntelProvider({ children }: { children: ReactNode }) {
         audience: row.market_audiences?.name ?? "", publishDate: row.publish_date ?? "", publishTime: row.publish_time ?? "",
         owner: row.owner ?? "", status: row.status,
       })),
+      attribution: Array.from(attribution.values()),
+      unattributedRevenue,
     });
   }, []);
+
 
   useEffect(() => { void refresh(); }, [refresh]);
 
