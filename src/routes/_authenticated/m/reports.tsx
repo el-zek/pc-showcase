@@ -208,3 +208,7 @@ function Reports() {
   );
 }
 
+
+function Empty() {
+  return <div className="grid h-full place-items-center text-sm text-white/55">No data recorded yet.</div>;
+}
