@@ -302,7 +302,12 @@ function CampaignsPage() {
                       <Mini label="Acquired" value={e.acquired.toLocaleString()} />
                       <Mini label="CAC" value={e.cac > 0 ? money(e.cac) : "—"} />
                       <Mini label="ROAS" value={e.cost > 0 ? `${e.roas.toFixed(2)}x` : "—"} />
+                      <Mini label="Attributed revenue" value={money(e.attributedRevenue)} />
+                      <Mini label="Attributed orders" value={e.attributedOrders.toLocaleString()} />
+                      <Mini label="Reported revenue" value={e.reportedRevenue > 0 ? money(e.reportedRevenue) : "—"} />
+                      <Mini label="ROI" value={e.cost > 0 ? `${e.roi.toFixed(0)}%` : "—"} />
                     </div>
+
                   </div>
                 </div>
                 <div className="mt-3 flex items-center gap-2 border-t border-white/10 pt-3">
