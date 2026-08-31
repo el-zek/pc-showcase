@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Receipt } from "lucide-react";
+import { CreditCard, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/tax/record-dialog";
+import { ConfirmDialog, RecordDialog, num, str, type FieldValue } from "@/components/tax/record-dialog";
 import { DetailsDrawer, StatusBadge, SummaryStrip, TaxTable, TaxWorkspace, exportCsv } from "@/components/tax/tax-workspace";
 import { productSpec } from "@/components/sales/line-items-editor";
 import { formatMoney, useSales, type SaleRecord } from "@/components/sales/sales-provider";
+import { accountLabel, usePaymentAccounts } from "@/components/finance/source-payment";
+import { PAYMENT_METHODS } from "@/lib/expense-catalog";
 import { useBusinessProfile } from "@/hooks/use-business-profile";
 import { buildSalesDocumentPdf } from "@/lib/sales-pdf";
 
@@ -14,12 +16,41 @@ export const Route = createFileRoute("/_authenticated/m/sales/invoices")({ compo
 
 function InvoicesPage() {
   const business = useBusinessProfile();
-  const { sales, saleItems, products, customers, deleteSale, metrics } = useSales();
+  const { sales, saleItems, products, customers, deleteSale, savePayment, metrics } = useSales();
   const [detail, setDetail] = useState<SaleRecord | null>(null);
   const [pendingDelete, setPendingDelete] = useState<SaleRecord | null>(null);
+  const [payFor, setPayFor] = useState<SaleRecord | null>(null);
+  const { data: accounts = [] } = usePaymentAccounts();
 
   const rows = sales.filter((row) => row.status !== "Draft");
   const payState = (row: SaleRecord) => (row.amountPaid >= row.total ? "Paid" : row.amountPaid > 0 ? "Partial" : "Unpaid");
+  const outstandingOf = (row: SaleRecord) => Math.max(0, row.total - row.amountPaid);
+
+  /** Records a real customer payment; cash/bank moves once, the invoice balance follows. */
+  const submitPayment = (value: Record<string, FieldValue>) => {
+    if (!payFor) return;
+    const amount = num(value.amount);
+    const outstanding = outstandingOf(payFor);
+    if (amount <= 0) { toast.error("Enter an amount greater than zero"); return; }
+    if (amount > outstanding + 0.005) { toast.error("Amount is more than the outstanding balance"); return; }
+    const account = (accounts as any[]).find((row) => accountLabel(row) === str(value.account));
+    void savePayment({
+      saleId: payFor.id,
+      invoiceNumber: payFor.invoiceNumber,
+      customerName: payFor.customerName,
+      paymentDate: str(value.paymentDate),
+      amount,
+      method: account ? accountLabel(account) : str(value.paymentMethod) || "Cash",
+      reference: str(value.reference),
+      notes: str(value.notes),
+      status: "Received",
+    }).then(() => {
+      toast.success("Payment recorded");
+      setPayFor(null);
+      setDetail(null);
+    });
+  };
+
 
   const download = (row: SaleRecord) => {
     const customer = customers.find((c) => c.id === row.customerId);
