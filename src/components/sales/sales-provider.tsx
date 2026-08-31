@@ -658,17 +658,41 @@ export function SalesProvider({ children }: { children: ReactNode }) {
         notes: record.notes || null,
         status: record.status,
       };
+      let paymentId = id ?? "";
       if (id) await supabase.from("sales_payments").update(row as any).eq("id", id);
-      else await supabase.from("sales_payments").insert(row as any);
+      else {
+        const inserted = await supabase.from("sales_payments").insert(row as any).select("id").maybeSingle();
+        paymentId = String((inserted.data as any)?.id ?? "");
+      }
 
-      if (record.saleId && record.status === "Received") {
-        const sale = sales.find((row2) => row2.id === record.saleId);
-        if (sale) {
-          const others = payments
-            .filter((p) => p.saleId === record.saleId && p.status === "Received" && p.id !== id)
-            .reduce((sum, p) => sum + p.amount, 0);
-          const paid = Math.min(sale.total, others + record.amount);
-          await supabase.from("sales").update({ amount_paid: paid } as any).eq("id", sale.id);
+      const sale = record.saleId ? sales.find((row2) => row2.id === record.saleId) : undefined;
+      if (sale && record.status === "Received") {
+        const others = payments
+          .filter((p) => p.saleId === record.saleId && p.status === "Received" && p.id !== id)
+          .reduce((sum, p) => sum + p.amount, 0);
+        const paid = Math.min(sale.total, others + record.amount);
+        await supabase.from("sales").update({ amount_paid: paid } as any).eq("id", sale.id);
+      }
+
+      // Cash/bank moves only from the actual payment — mirrored once per sales_payment.
+      if (paymentId) {
+        if (record.status === "Received") {
+          const account = await resolveAccount(record.method);
+          await upsertMirrorPayment("sales_payment", paymentId, {
+            paymentType: "Customer Payment",
+            direction: "in",
+            amount: record.amount,
+            paymentDate: record.paymentDate || today(),
+            accountId: account?.id,
+            paymentMethod: account?.payment_method || account?.name || record.method || "Cash",
+            description: `Payment for ${record.invoiceNumber || "sale"}`,
+            customerId: sale?.customerId,
+            customerName: record.customerName,
+            invoiceNumber: record.invoiceNumber,
+            reference: record.reference,
+          });
+        } else {
+          await deleteLinkedPayments("sales_payment", paymentId);
         }
       }
       await refresh();
@@ -678,11 +702,23 @@ export function SalesProvider({ children }: { children: ReactNode }) {
 
   const deletePayment = useCallback(
     async (id: string) => {
+      const target = payments.find((row) => row.id === id);
       await supabase.from("sales_payments").delete().eq("id", id);
+      await deleteLinkedPayments("sales_payment", id);
+      if (target?.saleId) {
+        const sale = sales.find((row) => row.id === target.saleId);
+        if (sale) {
+          const paid = payments
+            .filter((p) => p.saleId === target.saleId && p.status === "Received" && p.id !== id)
+            .reduce((sum, p) => sum + p.amount, 0);
+          await supabase.from("sales").update({ amount_paid: Math.min(sale.total, paid) } as any).eq("id", sale.id);
+        }
+      }
       await refresh();
     },
-    [refresh],
+    [payments, sales, refresh],
   );
+
 
   /* -------------------------------- metrics ------------------------------- */
 
