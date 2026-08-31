@@ -140,3 +140,27 @@ export async function resolveAccount(label: string) {
     null
   );
 }
+
+/** Every linked payment for one source type, grouped by source id (for list views). */
+export async function fetchLinkedPaymentMap(type: PaymentSourceType): Promise<Record<string, LinkedPayment[]>> {
+  const { data } = await supabase
+    .from("finance_payments")
+    .select("id,amount,payment_date,status,direction,account_id,payment_method,reference")
+    .like("reference", `%[src:${type}:%`);
+  const map: Record<string, LinkedPayment[]> = {};
+  for (const row of (data ?? []) as any[]) {
+    const link = parseLink(row.reference);
+    if (!link || link.type !== type) continue;
+    (map[link.id] ??= []).push({
+      id: row.id,
+      amount: Number(row.amount ?? 0),
+      paymentDate: String(row.payment_date ?? ""),
+      status: String(row.status ?? ""),
+      direction: row.direction === "in" ? "in" : "out",
+      accountId: String(row.account_id ?? ""),
+      paymentMethod: String(row.payment_method ?? ""),
+      reference: cleanReference(row.reference),
+    });
+  }
+  return map;
+}
