@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Receipt, Plus } from "lucide-react";
+import { Receipt, Plus, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useTaxModule, formatCurrency, periodOf, type ExpenseRecord } from "@/components/tax-module-provider";
 import { RecordDialog, ConfirmDialog, bool, num, str, type FieldValue } from "@/components/tax/record-dialog";
 import { DetailsDrawer, StatusBadge, SummaryStrip, TaxTable, TaxWorkspace, exportCsv } from "@/components/tax/tax-workspace";
+import { SourcePaymentDialog, payStateOf } from "@/components/finance/source-payment";
+import { deleteLinkedPayments, fetchLinkedPaymentMap, sumCompleted } from "@/lib/finance-link";
 import { EXPENSE_CATALOG, EXPENSE_FREQUENCIES, PAYMENT_METHODS, itemsForCategory, daysUntil, advanceDate, frequencyLabel } from "@/lib/expense-catalog";
 
 /** Categories where a supplier/vendor is meaningful. */
@@ -27,6 +29,16 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
   const [editing, setEditing] = useState<ExpenseRecord | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [detail, setDetail] = useState<ExpenseRecord | null>(null);
+  const [payFor, setPayFor] = useState<ExpenseRecord | null>(null);
+
+  // Cash only leaves the business when an expense is actually paid.
+  const { data: paymentMap = {}, refetch: refetchPayments } = useQuery({
+    queryKey: ["linked-payments", "expense"],
+    queryFn: () => fetchLinkedPaymentMap("expense"),
+  });
+  const paidOf = (row: ExpenseRecord) => sumCompleted(paymentMap[row.id] ?? []);
+  const outstandingOf = (row: ExpenseRecord) => Math.max(0, row.amount - paidOf(row));
+  const payStateFor = (row: ExpenseRecord) => payStateOf(row.amount, paidOf(row));
   const [pendingDelete, setPendingDelete] = useState<ExpenseRecord | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("");
 
@@ -120,7 +132,11 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
       }
     >
       <SummaryStrip
-        items={[{ label: "Total Expenses", value: formatCurrency(metrics.expenseTotal), hint: `${expenses.length} records`, accent: true }]}
+        items={[
+          { label: "Total Expenses", value: formatCurrency(metrics.expenseTotal), hint: `${expenses.length} records`, accent: true },
+          { label: "Paid", value: formatCurrency(expenses.reduce((sum, row) => sum + paidOf(row), 0)), tone: "success" },
+          { label: "Outstanding", value: formatCurrency(expenses.reduce((sum, row) => sum + outstandingOf(row), 0)), tone: "warning" },
+        ]}
       />
 
       {upcoming.length > 0 ? (
@@ -150,11 +166,18 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
           { key: "item", label: "Item", hideOnMobile: true, render: (row) => row.item || "—" },
           { key: "date", label: "Date", hideOnMobile: true },
           { key: "amount", label: "Amount", render: (row) => formatCurrency(row.amount) },
-          { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
+          { key: "pay", label: "Payment", render: (row) => <StatusBadge value={payStateFor(row)} /> },
+          { key: "status", label: "Status", hideOnMobile: true, render: (row) => <StatusBadge value={row.status} /> },
         ]}
         onRowClick={setDetail}
         onEdit={openEdit}
         onDelete={setPendingDelete}
+        rowActions={(row) => [
+          { label: "View details", onSelect: () => setDetail(row) },
+          ...(outstandingOf(row) > 0 ? [{ label: "Record payment", onSelect: () => setPayFor(row) }] : []),
+          { label: "Edit", onSelect: () => openEdit(row) },
+          { label: "Delete", onSelect: () => setPendingDelete(row), danger: true },
+        ]}
         onExport={(rows) =>
           exportCsv(
             "expenses.csv",
@@ -212,6 +235,9 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
                 { label: "Payment method", value: detail.paymentMethod || "—" },
                 ...(detail.supplierId ? [{ label: "Supplier", value: (suppliers as any[]).find((row) => row.id === detail.supplierId)?.name ?? "—" }] : []),
                 ...(detail.campaignId ? [{ label: "Campaign", value: (campaigns as any[]).find((row) => row.id === detail.campaignId)?.name ?? "—" }] : []),
+                { label: "Paid", value: formatCurrency(paidOf(detail)) },
+                { label: "Outstanding", value: formatCurrency(outstandingOf(detail)) },
+                { label: "Payment", value: <StatusBadge value={payStateFor(detail)} /> },
                 { label: "Notes", value: detail.notes || "—" },
                 { label: "Recurring", value: detail.isRecurring ? `${frequencyLabel(detail.frequency)}${detail.nextDueDate ? ` · next ${detail.nextDueDate}` : ""}` : "No" },
                 { label: "Status", value: <StatusBadge value={detail.status} /> },
@@ -232,6 +258,11 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
                   }}
                 >Confirm expense</Button>
               ) : null}
+              {outstandingOf(detail) > 0 ? (
+                <Button className="bg-emerald-500 text-black hover:bg-emerald-400" onClick={() => setPayFor(detail)}>
+                  <CreditCard className="mr-1.5 h-4 w-4" /> Record payment
+                </Button>
+              ) : null}
               <Button variant="outline" className="border-white/15 bg-white/5 text-white hover:bg-white/15" onClick={() => { openEdit(detail); setDetail(null); }}>Edit</Button>
               <Button className="bg-rose-500 text-white hover:bg-rose-400" onClick={() => { setPendingDelete(detail); setDetail(null); }}>Delete</Button>
             </>
@@ -240,12 +271,33 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
       />
 
 
+      {payFor ? (
+        <SourcePaymentDialog
+          open
+          onClose={() => setPayFor(null)}
+          sourceType="expense"
+          sourceId={payFor.id}
+          outstanding={outstandingOf(payFor)}
+          direction="out"
+          paymentType="Expense Payment"
+          description={`Payment for ${payFor.description}`}
+          counterparty={{ supplierId: payFor.supplierId || undefined }}
+          onSaved={async () => { await refetchPayments(); setDetail(null); }}
+        />
+      ) : null}
+
       <ConfirmDialog
         open={Boolean(pendingDelete)}
         title="Delete expense"
         description={`${pendingDelete?.description ?? ""} will be removed from your expense register.`}
         onClose={() => setPendingDelete(null)}
-        onConfirm={() => { if (pendingDelete) { deleteExpense(pendingDelete.id); toast.success("Expense deleted"); } }}
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          const id = pendingDelete.id;
+          deleteExpense(id);
+          void deleteLinkedPayments("expense", id).then(() => refetchPayments());
+          toast.success("Expense deleted");
+        }}
       />
     </TaxWorkspace>
   );
