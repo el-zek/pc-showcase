@@ -104,8 +104,6 @@ function PurchasesPage() {
           { key: "pay", label: "Payment", render: (row) => <StatusBadge value={payStateFor(row)} /> },
         ]}
         onRowClick={setDetail}
-        onEdit={openEdit}
-        onDelete={setPendingDelete}
         rowActions={(row) => [
           { label: "View details", onSelect: () => setDetail(row) },
           ...(outstandingOf(row) > 0 ? [{ label: "Pay supplier", onSelect: () => setPayFor(row) }] : []),

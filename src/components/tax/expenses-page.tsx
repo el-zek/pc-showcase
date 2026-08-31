@@ -170,8 +170,6 @@ export function ExpensesPage({ backTo, backLabel }: { backTo?: string; backLabel
           { key: "status", label: "Status", hideOnMobile: true, render: (row) => <StatusBadge value={row.status} /> },
         ]}
         onRowClick={setDetail}
-        onEdit={openEdit}
-        onDelete={setPendingDelete}
         rowActions={(row) => [
           { label: "View details", onSelect: () => setDetail(row) },
           ...(outstandingOf(row) > 0 ? [{ label: "Record payment", onSelect: () => setPayFor(row) }] : []),
