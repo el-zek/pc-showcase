@@ -111,6 +111,7 @@ function InvoicesPage() {
         onRowClick={setDetail}
         rowActions={(row) => [
           { label: "View details", onSelect: () => setDetail(row) },
+          ...(outstandingOf(row) > 0 ? [{ label: "Record payment", onSelect: () => setPayFor(row) }] : []),
           { label: "Download PDF", onSelect: () => download(row) },
           { label: "Delete", onSelect: () => setPendingDelete(row), danger: true },
         ]}
@@ -136,6 +137,7 @@ function InvoicesPage() {
                 { label: "Discount", value: formatMoney(detail.discountAmount) },
                 { label: "Total", value: formatMoney(detail.total) },
                 { label: "Paid", value: formatMoney(detail.amountPaid) },
+                { label: "Outstanding", value: formatMoney(outstandingOf(detail)) },
                 { label: "Payment", value: <StatusBadge value={payState(detail)} /> },
               ]
             : []
@@ -143,12 +145,37 @@ function InvoicesPage() {
         footer={
           detail ? (
             <>
+              {outstandingOf(detail) > 0 ? (
+                <Button className="bg-emerald-500 text-black hover:bg-emerald-400" onClick={() => setPayFor(detail)}>
+                  <CreditCard className="mr-1.5 h-4 w-4" /> Record payment
+                </Button>
+              ) : null}
               <Button variant="outline" className="border-white/15 bg-white/5 text-white hover:bg-white/15" onClick={() => download(detail)}>Download PDF</Button>
               <Button className="bg-rose-500 text-white hover:bg-rose-400" onClick={() => { setPendingDelete(detail); setDetail(null); }}>Delete</Button>
             </>
           ) : null
         }
       />
+
+      <RecordDialog
+        open={Boolean(payFor)}
+        icon={CreditCard}
+        title="Record payment"
+        description={payFor ? `Outstanding: ${formatMoney(outstandingOf(payFor))}` : ""}
+        submitLabel="Record payment"
+        initialValue={{ paymentDate: new Date().toISOString().slice(0, 10), amount: payFor ? Math.round(outstandingOf(payFor)) : 0 }}
+        onClose={() => setPayFor(null)}
+        onSubmit={submitPayment}
+        fields={[
+          { name: "amount", label: "Amount", type: "number", required: true, half: true },
+          { name: "paymentDate", label: "Date", type: "date", required: true, half: true },
+          { name: "paymentMethod", label: "Payment method", type: "select", options: PAYMENT_METHODS, half: true },
+          { name: "account", label: "Cash / bank account", type: "select", options: (accounts as any[]).map(accountLabel), half: true },
+          { name: "reference", label: "Reference", type: "text", half: true },
+          { name: "notes", label: "Notes", type: "text" },
+        ]}
+      />
+
 
       <ConfirmDialog
         open={Boolean(pendingDelete)}
