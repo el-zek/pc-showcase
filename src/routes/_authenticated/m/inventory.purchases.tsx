@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { ShoppingBag, Plus } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ShoppingBag, Plus, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +13,8 @@ import {
 } from "@/components/tax-module-provider";
 import { RecordDialog, ConfirmDialog, num, str, type FieldValue } from "@/components/tax/record-dialog";
 import { DetailsDrawer, StatusBadge, SummaryStrip, TaxTable, TaxWorkspace, exportCsv } from "@/components/tax/tax-workspace";
+import { SourcePaymentDialog, payStateOf } from "@/components/finance/source-payment";
+import { deleteLinkedPayments, fetchLinkedPaymentMap, sumCompleted } from "@/lib/finance-link";
 
 export const Route = createFileRoute("/_authenticated/m/inventory/purchases")({
   component: () => (
@@ -27,9 +30,21 @@ function PurchasesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [detail, setDetail] = useState<PurchaseRecord | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PurchaseRecord | null>(null);
+  const [payFor, setPayFor] = useState<PurchaseRecord | null>(null);
+
+  // Money actually paid to suppliers — purchases themselves never move cash.
+  const { data: paymentMap = {}, refetch: refetchPayments } = useQuery({
+    queryKey: ["linked-payments", "purchase"],
+    queryFn: () => fetchLinkedPaymentMap("purchase"),
+  });
+  const paidOf = (row: PurchaseRecord) => sumCompleted(paymentMap[row.id] ?? []);
+  const outstandingOf = (row: PurchaseRecord) => Math.max(0, row.amount - paidOf(row));
+  const payStateFor = (row: PurchaseRecord) => payStateOf(row.amount, paidOf(row));
+  const totalPaid = purchases.reduce((sum, row) => sum + paidOf(row), 0);
 
   const openCreate = () => { setEditing(null); setFormOpen(true); };
   const openEdit = (row: PurchaseRecord) => { setEditing(row); setFormOpen(true); };
+
 
   const submit = (value: Record<string, FieldValue>) => {
     savePurchase(
